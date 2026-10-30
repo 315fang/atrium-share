@@ -14,12 +14,20 @@ describe("share page URLs", () => {
   it.each([
     "http://files.example.com/c/DemoSearch12",
     "http://localhost.example.com/c/DemoSearch12",
-    "https://user:password@files.example.com/c/DemoSearch12",
     "https://files.example.com/c/DemoSearch12?download=1",
     "https://files.example.com/c/DemoSearch12#file=0",
     "https://files.example.com/object/long-file-name.mp4",
     "javascript:alert(1)",
   ])("rejects an unsafe link or a direct download: %s", (value) => {
     expect(isSharePageUrl(new URL(value))).toBe(false);
+  });
+
+  it("rejects credentials embedded in a preview URL", () => {
+    const url = new URL("https://files.example.com/c/DemoSearch12");
+    url.username = "fixture";
+    expect(isSharePageUrl(url)).toBe(false);
+    url.username = "";
+    url.password = "fixture";
+    expect(isSharePageUrl(url)).toBe(false);
   });
 });

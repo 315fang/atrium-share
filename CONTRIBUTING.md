@@ -1,127 +1,83 @@
-# Contributing to Atrium
+# Contributing to Atrium Share
 
-Thanks for your interest in contributing.
+Atrium Share is a fork of [aldy505/atrium](https://github.com/aldy505/atrium), maintained at [315fang/atrium-share](https://github.com/315fang/atrium-share). Contributions to this fork should target its `master` branch. A change intended for upstream should be prepared separately against the upstream repository.
 
-This project is a TypeScript monorepo-style app with:
+## Development environment
 
-- Frontend: React + Vite (`src/app`, `src/components`)
-- Backend: Fastify (`src/server`)
-- Session/auth: secure cookie + Redis token mapping
-- Object storage: S3-compatible providers (MinIO for local development)
-
-## Prerequisites
-
-- Node.js 20+
-- `pnpm` (required)
-- Docker + Docker Compose (recommended for local MinIO/Redis)
-
-## Getting Started
-
-1. Install dependencies:
-
-   ```bash
-   pnpm install
-   ```
-
-2. Copy environment variables:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-3. Start local infra + app (recommended):
-
-   ```bash
-   docker-compose up --build
-   ```
-
-   Or run app in dev mode locally:
-
-   ```bash
-   pnpm dev
-   ```
-
-## Project Structure
-
-- `src/app`: frontend app entry and app-level logic
-- `src/components`: reusable UI components
-- `src/server`: Fastify API, auth/session, S3 integration, observability
-- `.agents/docs`: implementation history and handoff context
-
-## Development Workflow
-
-1. Create a branch from `master`.
-2. Keep changes focused and small.
-3. Prefer root-cause fixes over surface patches.
-4. Update docs when behavior/config changes.
-
-## Quality Checks
-
-Before opening a PR, run:
+- Node.js 24+; the server uses the built-in `node:sqlite` module.
+- pnpm 10.34.5, as pinned in `package.json`.
+- Docker and Docker Compose for isolated Redis and MinIO test services.
+- `ffmpeg` and `ffprobe` on `PATH` for video metadata and media tests. The application Dockerfile installs both.
 
 ```bash
-pnpm typecheck
-pnpm build
-pnpm run lint
+corepack enable
+pnpm install --frozen-lockfile
+cp .env.example .env
 ```
 
-Formatting workflow (`package.json` scripts):
+Follow [Deployment](docs/deployment.md) to configure a development bucket and the share reader. When running the application on the host, point Redis and S3 at host-accessible addresses and set all SQLite/cache paths to a writable local data directory. Compose service names resolve inside the Compose network, not on the host. Use `NODE_ENV=development` for local HTTP.
 
-- `pnpm run fmt` → applies formatting changes.
-- `pnpm run fmt:check` → checks formatting without modifying files.
+```bash
+pnpm dev
+```
 
-If formatting changes are needed, run:
+S3 endpoint, region, and path-style settings belong in server configuration, not user-editable login fields. The interface currently uses Chinese; keep user-facing text consistent with the existing language.
+
+## Tests
+
+The full suite includes Redis-backed session tests, S3 integration tests, file index and upload tests, share access tests, media generation, archives, and UI interactions. Use disposable services:
+
+```bash
+docker compose -p atrium-share-test -f deploy/compose.test.yml up -d --build --wait
+pnpm test
+```
+
+By default, test helpers connect to Redis at `127.0.0.1:6379` and MinIO at `127.0.0.1:9000` using the test credentials from the test Compose file. The following variables can override test connections:
+
+| Variable                                                       | Purpose                                         |
+| -------------------------------------------------------------- | ----------------------------------------------- |
+| `TEST_REDIS_URL`                                               | Redis used by integration test helpers          |
+| `TEST_MINIO_ENDPOINT`                                          | S3 endpoint used by integration test helpers    |
+| `TEST_ACCESS_KEY_ID`, `TEST_SECRET_ACCESS_KEY`                 | Disposable S3 test credentials                  |
+| `TEST_BUCKET`                                                  | Disposable test bucket name                     |
+| `REDIS_URL`, `S3_ENDPOINT`, `S3_REGION`, `S3_FORCE_PATH_STYLE` | Matching server configuration imported by tests |
+
+Run tests with `NODE_ENV=test`. If overriding service locations, set both the helper and server variables so they use the same disposable services. Tests create and delete objects and session keys; never use production buckets or Redis.
+
+Run a focused test while making a change, for example:
+
+```bash
+pnpm exec vitest run tests/share-control.test.ts
+```
+
+Stop the test services when finished:
+
+```bash
+docker compose -p atrium-share-test -f deploy/compose.test.yml down
+```
+
+## Before opening a pull request
+
+Create a feature branch, keep unrelated refactors separate, and run the required checks:
 
 ```bash
 pnpm run fmt
+pnpm run lint:fix
+pnpm run fmt:check
+pnpm run lint
+pnpm run typecheck
+pnpm test
+pnpm run build
 ```
 
-## Coding Guidelines
+Add tests for changed behavior at the appropriate boundary. Share changes should exercise metadata, preview, download, media, ZIP, expiry, password, and revocation paths as applicable. Upload changes should preserve cancellation, resume state, conflict handling, and memory limits. When a change affects setup, update `.env.example` and the deployment/configuration documentation together.
 
-- Use strict TypeScript patterns already present in the codebase.
-- Keep API routes under `/api/*`.
-- Do not add provider endpoint/region controls to UI (backend env only).
-- Avoid introducing unrelated refactors in feature/fix PRs.
-- Preserve existing architecture (React app + Fastify backend) unless discussed first.
+Include the problem, resulting behavior, validation, and any configuration or migration steps in the PR description. For visible UI changes, include screenshots made with sample data. Redact credentials, private filenames, object paths, and share codes from reports and screenshots.
 
-## Testing Notes
+## Commits and provenance
 
-- Validate both frontend and backend flows for feature changes.
-- For S3-related changes, verify against local MinIO when possible.
-- For auth/session changes, verify login/logout/session expiry behavior.
+Use a focused Conventional Commit message, such as `fix(shares): Search titles and short codes`. Follow [AGENTS.md](AGENTS.md) for repository conventions. Commits primarily authored by an AI coding agent must include its `Co-Authored-By` attribution as required there.
 
-## Observability Notes
+Keep upstream copyright notices, [LICENSE](LICENSE), and [ATTRIBUTION.md](ATTRIBUTION.md). Contributions are provided under Apache-2.0 unless a file states another applicable license.
 
-- Backend Sentry is initialized via preload module in production start.
-- Frontend Sentry runtime config is fetched from `/api/runtime-config`.
-- If adding/changing metrics, document metric names in `README.md`.
-
-## Pull Request Guidelines
-
-Please include in your PR description:
-
-- What changed
-- Why it changed
-- How to test it
-- Any env/config updates
-- Screenshots for UI changes (if applicable)
-
-Keep PRs reviewable; split large changes into multiple PRs when possible.
-
-## Commit Messages
-
-Use clear, concise commit messages (Conventional Commit style preferred), e.g.:
-
-- `feat: add object pagination for large buckets`
-- `fix: handle missing runtime sentry config gracefully`
-- `docs: update setup and observability notes`
-
-## Security & Secrets
-
-- Never commit credentials, tokens, or `.env` files.
-- Treat access keys and session identifiers as sensitive.
-- Redact sensitive values in logs and issue reports.
-
-## Questions
-
-If you are unsure about approach or scope, open a draft PR early and ask for feedback before deep implementation.
+Do not commit `.env` files, service reader credentials, databases, caches, runtime logs, upload sources, or deployment snapshots. Report sensitive security findings according to [SECURITY.md](SECURITY.md).

@@ -1,0 +1,36 @@
+# syntax=docker/dockerfile:1
+# Disposable S3 integration-test dependency, built from upstream source.
+# MinIO RELEASE.2025-09-07T16-13-09Z, commit 07c3a429bfed433e49018cb0f78a52145d4bedeb.
+FROM golang:1.24.13-alpine AS build
+
+# Keep compilation practical on hosts with about 2 GiB of RAM.
+ENV CGO_ENABLED=0 \
+    GOTOOLCHAIN=local \
+    GOMAXPROCS=1 \
+    GOMEMLIMIT=768MiB \
+    GOGC=25 \
+    GOFLAGS="-p=1"
+WORKDIR /src
+ADD --checksum=sha256:8819e3e7817e46b7b3798f8f200ead208562e571563c2e040352378031abe9f2 \
+    https://codeload.github.com/minio/minio/tar.gz/07c3a429bfed433e49018cb0f78a52145d4bedeb /tmp/minio.tar.gz
+RUN tar -xzf /tmp/minio.tar.gz --strip-components=1 -C /src && rm /tmp/minio.tar.gz
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go build -mod=readonly -trimpath -buildvcs=false -ldflags="-s -w" -o /out/minio .
+
+FROM alpine:3.22
+RUN apk add --no-cache ca-certificates curl \
+    && addgroup -S -g 10001 minio \
+    && adduser -S -u 10001 -G minio minio \
+    && mkdir -p /data \
+    && chown minio:minio /data
+COPY --from=build /out/minio /usr/local/bin/minio
+COPY --from=build /src/LICENSE /usr/share/licenses/minio/LICENSE
+LABEL org.opencontainers.image.source="https://github.com/minio/minio" \
+    org.opencontainers.image.revision="07c3a429bfed433e49018cb0f78a52145d4bedeb" \
+    org.opencontainers.image.licenses="AGPL-3.0-only"
+ENV GOMAXPROCS=1 GOMEMLIMIT=256MiB MINIO_UPDATE=off
+USER minio
+EXPOSE 9000 9001
+ENTRYPOINT ["minio"]
+CMD ["server", "/data", "--console-address", ":9001"]

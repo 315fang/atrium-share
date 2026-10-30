@@ -1,29 +1,24 @@
-name: Trufflehog
+name: Secret scan
 
 on:
   push:
-    branches: [master]
+    branches: [master, main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
-  id-token: write
-  issues: write
-  pull-requests: write
 
 jobs:
   scan:
-    name: Trufflehog scan
+    name: TruffleHog
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
     steps:
-      - name: Checkout code
+      - name: Checkout history
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-      - name: Secret Scanning
-        uses: trufflesecurity/trufflehog@main
+      - name: Scan for secrets
+        uses: trufflesecurity/trufflehog@421026a6540c63cf143ef53a5859389d473e88da
         with:
           extra_args: --results=verified,unknown

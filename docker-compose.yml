@@ -3,24 +3,42 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: atrium-app
     ports:
-      - "3000:3000"
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
     env_file:
       - .env
+    environment:
+      PORT: "3000"
+      REDIS_URL: redis://redis:6379
+      SHARE_READER_CREDENTIALS_FILE: /run/secrets/share-reader.json
+      SHARE_DB_PATH: /app/data/shares.sqlite
+      SHARE_STORE_PATH: /app/data/shares.json
+      SHORT_LINK_STORE: /app/data/shortlinks.json
+      UPLOAD_STORE_PATH: /app/data/uploads.sqlite
+      OBJECT_INDEX_PATH: /app/data/objects.sqlite
+      MEDIA_CACHE_DIR: /app/data/media-cache
+      ARCHIVE_DIR: /app/data/archives
+      AUDIT_LOG_DIR: /app/audit-logs
+    volumes:
+      - atrium-data:/app/data
+      - audit-logs:/app/audit-logs
+      - type: bind
+        source: ./secrets/share-reader.json
+        target: /run/secrets/share-reader.json
+        read_only: true
+        bind:
+          create_host_path: false
     depends_on:
       redis:
         condition: service_healthy
-      minio:
-        condition: service_healthy
+    init: true
     restart: unless-stopped
 
   redis:
     image: redis:7-alpine
-    container_name: atrium-redis
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
-    ports:
-      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -28,28 +46,7 @@ services:
       retries: 5
     restart: unless-stopped
 
-  minio:
-    image: minio/minio:edge-cicd
-    container_name: atrium-minio
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
-    command: server /data --console-address ":9001"
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio-data:/data
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "wget -q -O- http://localhost:9000/minio/health/live >/dev/null 2>&1 || exit 1",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-
 volumes:
-  minio-data:
+  atrium-data:
+  audit-logs:
+  redis-data:

@@ -1,382 +1,83 @@
-# Atrium
+# Atrium Share
 
-Atrium is a self-hosted web app for browsing and managing S3-compatible object storage.
+[English](README.en.md) · [部署指南](docs/deployment.md) · [配置参考](docs/configuration.md) · [更新记录](CHANGELOG.md)
 
-> [!NOTE]
-> Hello! Human here. This project is vibe-coded with various AI models (you will
-> see Claude Sonnet 4.5, OpenAI GPT-5.3 Codex, and some other) during a long
-> weekend. I was trying what is it to really one-shot a software that I actually
-> need in real life, not just some janky project with AI slop in it.
->
-> Turns out, it actually works and by the time you read this, I probably have
-> this application running on my company.
->
-> My specific use case is that I'm moving away from MinIO to SeaweedFS because
-> of the drama and no-more-support, obviously. SeaweedFS does not provide a web
-> UI similar to MinIO did. In my company I have a really weird process that
-> needs the UI. Therefore, I really need one. Other solutions such as
-> S3 Browser and Cyberduck are not viable for me, because it's a freemium, not
-> fully open source.
+Atrium Share 是一个自托管的 S3 文件管理与分享应用。上传一批文件，复制一条短码链接；接收者无需登录，即可先看图片、播放视频、查看详情，再选择需要下载的文件。
 
-## Features
+本项目是 [aldy505/atrium](https://github.com/aldy505/atrium) 的独立维护 Fork，基于原有 React、Fastify 和 S3 管理能力扩展分享工作流。保留上游 Git 历史与 Apache-2.0 许可证，原作者及改动归因见 [ATTRIBUTION.md](ATTRIBUTION.md)。默认界面为中文。
 
-- Login with Access Key ID + Secret Access Key (no user account system)
-- Redis-backed secure session tokens with TTL and httpOnly cookie auth
-- Provider-agnostic S3 support (AWS S3, Cloudflare R2, MinIO, ...you name it)
-- Bucket and folder navigation with breadcrumbs
-- File upload (drag/drop or picker) with progress indication
-- File download with proper content-type and filename
-- Delete file or folder prefix with confirmation dialogs
-- File preview for:
-  - Images: `jpg`, `jpeg`, `png`, `gif`, `webp`, `svg`
-  - Text: `txt`, `md`, `json`, `xml`, `csv`, `log`
-  - PDF: `pdf` via a larger PDF.js-based viewer with thumbnails, search, zoom, and download access
-- Client-side filtering of current folder entries by name
+## 可以做什么
 
-## Architecture
+- **一批文件，一条链接**：勾选多个文件创建合集，或者生成只包含某个文件的独立链接。打开链接进入预览页，下载由接收者主动选择。
+- **预览与详情**：图片放大、缩放和前后翻阅；浏览器支持的音频和视频在线播放；文件大小、修改时间、图片尺寸、视频分辨率和时长；缓存缩略图和视频封面。
+- **管理已经发出的分享**：“我的分享”支持按标题或短码搜索、再次复制、修改标题、设置提取码与有效期、停用和恢复，以及访问与下载发起统计。
+- **批量上传与续传**：8 MiB 分片、暂停和恢复、失败重试、速度与剩余时间。同名文件默认保留两份，也可跳过或替换。
+- **按时间找文件**：服务端文件索引、最新修改时间优先排序、分页和当前目录的完整搜索。
+- **按需打包**：小包流式下载；较大的选择先准备 ZIP，显示进度，准备好后再点击下载。临时 ZIP 支持 Range 续传、复用和到期清理。
+- **手机分享**：响应式布局、文件勾选、二维码和可保存的分享卡片。
+- **保留自己的数据**：文件留在 S3 存储中；SQLite 保存分享、文件索引和上传进度，Redis 保存登录会话。
 
-This implementation uses a Vite + React frontend with a Fastify backend
-in one repository.
+上传恢复时，刷新页面后需要重新选择同一个本地文件。预览能力取决于文件格式和接收者浏览器；分享不是文件格式转码服务。下载发起次数也不代表文件已经保存成功。
 
-- Frontend: React + TypeScript (dashboard in `src/app`, reusable UI in `src/components`)
-- Backend: Node.js + Fastify + TypeScript (`src/server`)
-- S3 operations: AWS SDK v3 (`@aws-sdk/client-s3`)
-- Session store: Redis (`token -> credentials`, TTL)
-- Deployment: Docker Compose (`atrium-app`, `redis`, `minio`), or run it directly using Node.js
+## 从源码运行
 
-## Why Sentry and OpenFeature
-
-### Why Sentry
-
-Sentry gives Atrium a single place for errors, tracing, metrics, and logs. That
-keeps production debugging straightforward: if something goes wrong, we can
-trace the request, inspect the error, and correlate it with the surrounding
-telemetry without stitching together multiple tools.
-
-I intentionally did not take the OpenTelemetry-first route for this project.
-For Atrium, the error-reporting experience in Sentry is better suited to the
-workflow I want, and I want to avoid introducing observability plumbing that
-can become a performance bottleneck for an app that already spends a lot of
-time talking to S3 and Redis.
-
-### Why OpenFeature
-
-OpenFeature keeps feature flags vendor-agnostic, which is the same kind of
-abstraction benefit that OpenTelemetry brings to observability. Atrium currently
-supports two providers:
-
-- environment variables via `@openfeature/env-var-provider`
-- OFREP via `@openfeature/ofrep-provider`
-
-With this setup, Atrium can integrate with providers such as Flipt, Go Feature Flag,
-ConfigCat, or flagd when they are exposed via environment variables or an
-OFREP-compatible endpoint (or when you add and configure a dedicated OpenFeature
-provider for them). These vendors are not wired in out-of-the-box.
-
-## Quick Start
-
-### Docker Compose
-
-`edge` tag refers to the default branch. The following example is intended for a
-local development setup where Redis and MinIO run as sibling containers; service
-hostnames are used rather than `localhost` which would point to the container
-itself.
-
-```yaml
-services:
-  atrium:
-    image: "ghcr.io/aldy505/atrium:edge"
-    ports:
-      - "3000:3000"
-    environment:
-      REDIS_URL: "redis://redis:6379"
-      S3_ENDPOINT: "http://minio:9000"
-      S3_REGION: "us-east-1"
-      S3_FORCE_PATH_STYLE: true
-  redis:
-    image: redis:7-alpine
-  minio:
-    image: minio/minio:latest
-    command: server /data
-    environment:
-      MINIO_ROOT_USER: "minioadmin"
-      MINIO_ROOT_PASSWORD: "minioadmin"
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-```
-
-### Pre-built Artifacts
-
-If you prefer to run it directly using Node, you can download the pre-built
-artifacts from the [latest GitHub Actions run](https://github.com/aldy505/atrium/actions/workflows/ci.yaml).
-
-1. Download the artifacts that correspond with your environment (Linux amd64, Linux arm64, or Windows).
-2. Extract the archive (`unzip atrium-{platform}-{sha}.zip`)
-3. Run it using Node.js (`node --import ./dist/server/sentry.server.js ./dist/server/index.js`)
-
-I recommend running this using systemd, with a sample minimal service file of (assuming Node.js is installed at `/usr/bin/node`; adjust `ExecStart` if your installation differs):
-
-```ini
-[Unit]
-Description=Atrium
-After=network.target
-
-[Service]
-Type=simple
-User=atrium
-Group=atrium
-ExecReload=/bin/kill -HUP $MAINPID
-ExecStart=/usr/bin/node --use-openssl-ca --import ./dist/server/sentry.server.js dist/server/index.js
-Environment=NODE_ENV=production
-Environment=PORT=46550
-Environment=REDIS_URL=redis://localhost:6379/
-Environment=S3_ENDPOINT=https://s3.example.com
-Environment=S3_REGION=us-east-1
-Environment=S3_FORCE_PATH_STYLE=true
-Environment=MAX_UPLOAD_SIZE_MB=500
-Environment=AUDIT_LOG_SINK=filesystem
-Environment=AUDIT_LOG_DIR=/var/log/atrium/
-# ENABLE_BACKGROUND_BUCKET_SIZE_CALCULATION is the EnvVarProvider constant-case mapping of the
-# OpenFeature flag "enable-background-bucket-size-calculation".
-Environment=ENABLE_BACKGROUND_BUCKET_SIZE_CALCULATION=true
-
-WorkingDirectory=/etc/atrium
-SyslogIdentifier=atrium
-Restart=on-failure
-RestartSec=5s
-
-PrivateTmp=yes
-ReadWritePaths=/var/log/atrium
-NoNewPrivileges=true
-ProtectSystem=strict
-RestrictNamespaces=uts ipc pid user cgroup
-ProtectKernelTunables=yes
-ProtectKernelModules=yes
-ProtectControlGroups=yes
-PrivateDevices=yes
-RestrictSUIDSGID=true
-
-[Install]
-WantedBy=multi-user.target
-```
-
-### From source
-
-1. Copy env template:
+需要 Docker 和 Docker Compose，以及一个可用的 S3 兼容桶。生成发布者配置的辅助脚本使用 Node.js；直接运行或开发应用需要 **Node.js 24+** 和 **pnpm 10.34.5**。Docker 镜像在构建时安装 FFmpeg，供视频封面和媒体信息使用。
 
 ```bash
+git clone https://github.com/315fang/atrium-share.git
+cd atrium-share
 cp .env.example .env
+mkdir secrets
+cp deploy/share-reader.example.json secrets/share-reader.json
 ```
 
-2. Start all services:
+启动前配置：
+
+1. 在 `.env` 中填写 S3 端点、区域、路径样式设置和 `SHARE_BUCKET`。桶应已存在。
+2. 将 `SHARE_BASE_URL` 设为接收者可以打开的应用地址。本地开发可使用 `http://localhost:3000`；生产环境使用 HTTPS，并设置 `NODE_ENV=production`。
+3. 为服务创建只读的 S3 凭据，权限限于需要分享的桶，将其写入 `secrets/share-reader.json`。该文件不应提交到 Git。
+4. 运行下面的辅助脚本，输入允许发布分享的管理员 Access Key ID，将输出的哈希填入 `.env` 的 `SHARE_OWNER_HASH`。管理员登录凭据和服务读取凭据可以不同。
 
 ```bash
-docker compose up --build
+node scripts/share-owner-hash.mjs
+docker compose up -d --build
 ```
 
-3. Open Atrium:
+默认本地入口为 [http://localhost:3000](http://localhost:3000)。使用有相应桶权限的 S3 Access Key ID 和 Secret Access Key 登录管理界面，然后上传文件、勾选文件并点击“复制分享短链”。接收者打开该链接即可预览和选择下载。
 
-- App: http://localhost:3000
-- MinIO API: http://localhost:9000
-- MinIO Console: http://localhost:9001
+默认 Compose 启动应用和 Redis，连接你配置的外部 S3。完整的 HTTPS 反向代理、本地 MinIO 开发、数据卷、备份和升级方法见 [部署指南](docs/deployment.md)；所有分享与存储路径设置见 [配置参考](docs/configuration.md)。本项目提供源码构建流程，不要求使用预构建镜像。
 
-4. Login to Atrium using MinIO test credentials:
+## 分享权限的范围
 
-- Access Key ID: `minioadmin`
-- Secret Access Key: `minioadmin`
+提取码、有效期和停用状态统一作用于应用提供的详情、预览、缩略图、媒体信息、文件下载和 ZIP 接口。独立单文件分享仍继承其来源合集的访问限制。
 
-5. Create a bucket in MinIO Console first, then browse/upload/download/delete through Atrium.
+这些设置**不会关闭存储供应商上已经存在的公开对象地址**。需要完整的访问控制时，使用私有桶和仅供服务读取的凭据，并关闭对象的其他公开入口。短码链接本身也应视为持有即可访问的链接；需要额外限制时请设置提取码。
 
-## Environment Variables
+`SHARE_OWNER_HASH` 绑定允许创建分享的管理员身份，防止其他登录账号借用服务读取凭据的权限。管理界面使用 S3 凭据登录，当前版本没有注册、团队、租户或多发布者权限管理系统。
 
-| Variable                                       | Required | Default          | Description                                   |
-| ---------------------------------------------- | -------- | ---------------- | --------------------------------------------- |
-| `NODE_ENV`                                     | no       | `development`    | Runtime environment                           |
-| `PORT`                                         | no       | `3000`           | API/web app port                              |
-| `REDIS_URL`                                    | yes      | -                | Redis connection URL                          |
-| `SESSION_TTL_SECONDS`                          | no       | `86400`          | Session TTL in seconds                        |
-| `COOKIE_NAME`                                  | no       | `atrium_session` | Session cookie name                           |
-| `BUCKET_SIZE_CALC_INTERVAL_HOURS`              | no       | `1`              | Background bucket-size job interval (hours)   |
-| `BUCKET_SIZE_MAX_DURATION_MS`                  | no       | `300000`         | Max runtime per bucket size calculation       |
-| `BUCKET_SIZE_MAX_OBJECTS`                      | no       | `1000000`        | Max objects scanned per calculation           |
-| `ENABLE_S3_URI_COPY`                           | no       | `false`          | Show "Copy S3 URI" action in object sidebar   |
-| `S3_ENDPOINT`                                  | yes      | -                | S3-compatible endpoint URL                    |
-| `S3_REGION`                                    | yes      | -                | S3 region string                              |
-| `S3_FORCE_PATH_STYLE`                          | no       | `true`           | Use path-style S3 URLs (needed by MinIO)      |
-| `MAX_UPLOAD_SIZE_MB`                           | no       | `100`            | Per-file upload size limit                    |
-| `AUDIT_LOG_SINK`                               | no       | `filesystem`     | Audit log sink (`filesystem`, `loki`, `none`) |
-| `AUDIT_LOG_DIR`                                | no       | `audit-logs`     | Filesystem audit log directory                |
-| `AUDIT_LOG_RETENTION_DAYS`                     | no       | `30`             | Filesystem audit log retention (days)         |
-| `AUDIT_LOG_LOKI_URL`                           | no       | -                | Loki push endpoint (required for `loki`)      |
-| `SENTRY_DSN`                                   | no       | -                | Backend Sentry DSN                            |
-| `SENTRY_ENVIRONMENT`                           | no       | `development`    | Backend Sentry environment                    |
-| `SENTRY_RELEASE`                               | no       | `atrium@0.1.0`   | Backend release identifier                    |
-| `SENTRY_TRACES_SAMPLE_RATE`                    | no       | `0.1`            | Backend tracing sample rate                   |
-| `SENTRY_ENABLE_LOGS`                           | no       | `true`           | Enable backend Sentry logs                    |
-| `SENTRY_ENABLE_METRICS`                        | no       | `true`           | Enable backend Sentry metrics                 |
-| `FRONTEND_SENTRY_DSN`                          | no       | -                | Frontend Sentry DSN (runtime via API)         |
-| `FRONTEND_SENTRY_ENVIRONMENT`                  | no       | `NODE_ENV`       | Frontend Sentry environment (runtime)         |
-| `FRONTEND_SENTRY_RELEASE`                      | no       | -                | Frontend release identifier (runtime)         |
-| `FRONTEND_SENTRY_TRACES_SAMPLE_RATE`           | no       | `0.1`            | Frontend tracing sample rate (runtime)        |
-| `FRONTEND_SENTRY_ENABLE_LOGS`                  | no       | `true`           | Enable frontend Sentry logs (runtime)         |
-| `FRONTEND_SENTRY_ENABLE_METRICS`               | no       | `true`           | Enable frontend Sentry metrics (runtime)      |
-| `FRONTEND_SENTRY_REPLAYS_SESSION_SAMPLE_RATE`  | no       | `0.1`            | Frontend replay session sample (runtime)      |
-| `FRONTEND_SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE` | no       | `1.0`            | Frontend replay-on-error sample (runtime)     |
-
-## Configure for Different Providers
-
-Only backend env changes are needed. The UI always asks only for access key + secret key.
-
-### AWS S3
-
-```env
-S3_ENDPOINT=https://s3.amazonaws.com
-S3_REGION=us-east-1
-S3_FORCE_PATH_STYLE=false
-```
-
-### Cloudflare R2
-
-```env
-S3_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
-S3_REGION=auto
-S3_FORCE_PATH_STYLE=true
-```
-
-### Backblaze B2 (S3 Compatible)
-
-```env
-S3_ENDPOINT=https://s3.<REGION>.backblazeb2.com
-S3_REGION=<REGION>
-S3_FORCE_PATH_STYLE=true
-```
-
-### DigitalOcean Spaces
-
-```env
-S3_ENDPOINT=https://<REGION>.digitaloceanspaces.com
-S3_REGION=<REGION>
-S3_FORCE_PATH_STYLE=false
-```
-
-## Development
+## 开发与测试
 
 ```bash
-pnpm install
-pnpm dev
+corepack enable
+pnpm install --frozen-lockfile
+docker compose -p atrium-share-test -f deploy/compose.test.yml up -d --build --wait
+pnpm test
+pnpm run typecheck
+pnpm run lint
+pnpm run fmt:check
+pnpm run build
 ```
 
-- Vite dev server runs on `5173`
-- API server runs on `3000`
-- Vite proxies `/api` to backend
-- MinIO test credentials are `minioadmin` for access key and `minioadmin` for secret key.
+完整测试需要隔离的 Redis 和 MinIO，媒体测试需要本机可执行的 `ffmpeg` 与 `ffprobe`。不要把测试连接到实际使用的桶或 Redis。开发服务器和测试环境配置见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-## Optional Features
+## 数据与维护
 
-These are the current feature flags exposed through OpenFeature.
+应用数据目录包含分享数据库、上传任务、文件索引、媒体缓存和临时 ZIP，应通过持久卷保留。生产模式在启动时以及每 24 小时创建分享数据库快照，检查完整性并保留最近七份；这不替代 S3 文件和其他运行数据的备份。
 
-- `ENABLE_S3_URI_COPY=true` enables a **Copy S3 URI** button in the object detail sidebar.
-  - Copies `s3://<bucket>/<key>` to clipboard for files and folders.
-  - Uses Clipboard API with a fallback for older browsers.
-- `ENABLE_BACKGROUND_BUCKET_SIZE_CALCULATION=true` enables bucket size calculation via `ListObjectsV2`.
-  - This environment variable controls the OpenFeature flag `enable-background-bucket-size-calculation` referenced in the **Large Bucket Performance** section.
+原有 `shares.json` 与 `shortlinks.json` 会首次导入 SQLite，保留原短码，原 JSON 文件不被改写。升级或恢复前请备份整个数据目录，迁移说明见 [部署指南](docs/deployment.md)。
 
-## Production Build
+欢迎提交可复现的问题和范围明确的 PR，流程见 [贡献指南](CONTRIBUTING.md)。安全问题请按 [SECURITY.md](SECURITY.md) 报告。
 
-```bash
-pnpm build
-pnpm start
-```
+## 许可证
 
-- Backend Sentry initializes via Node ESM preload (`--import ./dist/server/sentry.server.js`) before Fastify boot.
-- Frontend Sentry runtime settings are fetched from `/api/runtime-config` at app startup. Configure values via `FRONTEND_SENTRY_*` environment variables; the server does not rely on build-time values.
-
-## Large Bucket Performance
-
-- Object listing is cursor-paginated server-side via S3 `ListObjectsV2` (`maxKeys` + continuation token).
-- Server-side folder/page listing cache is stored in Redis and keyed by session + bucket + prefix + continuation token + page size.
-- Cached list responses use TTL-based expiration (default `300s`) and can be toggled with `S3_LIST_CACHE_ENABLED`.
-- Cache invalidation runs after upload/delete operations with default `targeted` mode (prefix + parent prefixes), or `bucket` mode via `S3_LIST_CACHE_INVALIDATION_MODE`.
-- Optional diagnostics header `X-Atrium-S3-List-Cache` reports `HIT`, `MISS`, or `BYPASS` when `S3_LIST_CACHE_INCLUDE_HEADERS=true`.
-- Optional background bucket-size calculation can be enabled with OpenFeature flag `enable-background-bucket-size-calculation`.
-- Bucket-size API routes (feature-gated): `GET /api/s3/buckets/:bucketName/size` and `POST /api/s3/buckets/:bucketName/size/calculate`.
-- Frontend starts with page size `100`, then grows adaptively (`250` → `500` → `1000`) as more objects are loaded.
-- The object table uses virtualized rendering (`@tanstack/react-virtual`) so only visible rows are mounted.
-- Auto-load prefetch triggers near 80% scroll progress; manual **Load more** remains available.
-- Search input is debounced by `300ms`; very large folders show a warning that search is limited to loaded items.
-- For large buckets, the UI shows a warning dialog before entering folders and offers **Load first 1,000** mode.
-- Sort behavior is tiered:
-  - `<1k`: full client-side sort options
-  - `1k-10k`: client-side sort with transient sorting indicator
-  - `>10k`: non-native size/date sorts are disabled (name A-Z uses S3 native ordering)
-- For stress testing, this repository has been validated with a generated dataset of `5000` objects in MinIO.
-
-### Bucket Size Calculation Cost Notes
-
-- Bucket-size calculation uses paged `ListObjectsV2` calls (up to `1000` objects per request).
-- AWS S3 pricing is roughly `$0.005` per `1,000` LIST requests.
-- A bucket with `1,000,000` objects needs around `1,000` list calls (~`$0.005`) for one full calculation.
-- Running this hourly across many large buckets can add noticeable cost; tune interval and limits accordingly.
-
-## Sentry Metrics
-
-### Backend HTTP
-
-- `http.requests.total` (count)
-- `http.server.duration` (distribution, milliseconds)
-- `http.requests.errors` (count)
-
-### Upstream S3 Metrics
-
-- Latency per operation (distribution, milliseconds):
-  - `s3.list_buckets.latency`
-  - `s3.list_objects_v2.latency`
-  - `s3.put_object.latency`
-  - `s3.get_object.latency`
-  - `s3.delete_object.latency`
-- Transfer activity gauges:
-  - `s3.upload.files_in_flight`
-  - `s3.download.files_in_flight`
-
-### Authentication Gauges
-
-- `auth.success`
-- `auth.failure`
-
-Notes:
-
-- Auth gauges represent process-local totals and reset on server restart.
-- Frontend emits `frontend.app.boot` at initialization when frontend Sentry is enabled.
-
-## Security Notes
-
-- Credentials are never persisted in browser storage.
-- Session cookie is `httpOnly`; `secure` is enabled automatically in production mode.
-- Credentials are stored server-side in Redis under random high-entropy tokens with TTL.
-- Sessions are isolated; each token maps to one credential pair.
-- Endpoint and region are controlled by backend environment variables only.
-
-## Open Source Notes
-
-This repository is designed for self-hosting and extension. Future versions can add sharing links, batch operations, richer previews, and ACL tooling.
-
-## License
-
-```
-Copyright 2026 Reinaldy Rafli
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-```
-
-See [LICENSE](./LICENSE).
+[Apache License 2.0](LICENSE)。原项目由 Reinaldy Rafli（[@aldy505](https://github.com/aldy505)）及 Atrium contributors 开发，本 Fork 由 [@315fang](https://github.com/315fang) 维护。第三方依赖保留各自许可证。

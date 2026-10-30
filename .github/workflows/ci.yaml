@@ -2,22 +2,21 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, main]
   pull_request:
-    branches: [master]
+    branches: [master, main]
+  workflow_dispatch:
 
 permissions:
   contents: read
-  packages: write
-  id-token: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+  cancel-in-progress: true
 
 jobs:
-  lint-check:
-    name: Lint and check formatting
+  check:
+    name: Format, lint and types
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -29,133 +28,53 @@ jobs:
       - run: pnpm run fmt:check
       - run: pnpm run lint
       - run: pnpm run typecheck
-  build-test:
-    name: Build and test
+
+  test:
+    name: Build and complete test suite
     runs-on: ubuntu-latest
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      minio:
-        image: minio/minio:edge-cicd
-        ports:
-          - 9000:9000
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
-        options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version: "24"
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - name: Install media tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
-      - name: Run tests
         env:
-          REDIS_URL: redis://localhost:6379
-          S3_ENDPOINT: http://localhost:9000
+          NODE_ENV: production
+      - name: Build and start disposable integration services
+        run: docker compose -p atrium-share-test -f deploy/compose.test.yml up -d --build --wait
+      - run: pnpm test
+        env:
+          NODE_ENV: test
+          REDIS_URL: redis://127.0.0.1:6379
+          TEST_REDIS_URL: redis://127.0.0.1:6379
+          S3_ENDPOINT: http://127.0.0.1:9000
+          TEST_MINIO_ENDPOINT: http://127.0.0.1:9000
           S3_REGION: us-east-1
-          S3_FORCE_PATH_STYLE: true
-          TEST_MINIO_ENDPOINT: http://localhost:9000
-          TEST_REDIS_URL: redis://localhost:6379
+          S3_FORCE_PATH_STYLE: "true"
           TEST_ACCESS_KEY_ID: minioadmin
           TEST_SECRET_ACCESS_KEY: minioadmin
-        run: pnpm test
-  build-artifact:
-    name: Build artifact
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
-    strategy:
-      matrix:
-        runs-on: [ubuntu-24.04, ubuntu-24.04-arm, windows-latest]
-    runs-on: ${{ matrix.runs-on }}
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version: "24"
-      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
-      - run: rm -r -fo node_modules && pnpm install --prod --shamefully-hoist
-        if: ${{ matrix.runs-on == 'windows-latest' }}
-      - run: rm -rf node_modules && pnpm install --prod --shamefully-hoist
-        if: ${{ matrix.runs-on != 'windows-latest' }}
-      - id: name
-        shell: bash
-        run: |
-          set -o pipefail
-          if [ "${{ matrix.runs-on }}" == "ubuntu-24.04" ]; then
-            platform="linux-amd64"
-          elif [ "${{ matrix.runs-on }}" == "ubuntu-24.04-arm" ]; then
-            platform="linux-arm64"
-          elif [ "${{ matrix.runs-on }}" == "windows-latest" ]; then
-            platform="windows-amd64"
-          else
-            echo "Unsupported platform: ${{ matrix.runs-on }}"
-            exit 1
-          fi
+      - name: Integration service logs on failure
+        if: failure()
+        run: docker compose -p atrium-share-test -f deploy/compose.test.yml logs --no-color --tail=100
+      - name: Stop integration services
+        if: always()
+        run: docker compose -p atrium-share-test -f deploy/compose.test.yml down --remove-orphans
 
-          # cut first 7 characters of github.sha
-          short_sha=$(echo "${GITHUB_SHA}" | cut -c1-7)
-          echo "name=atrium-${platform}-${short_sha}" >> $GITHUB_OUTPUT
-      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
-        with:
-          name: ${{ steps.name.outputs.name }}
-          path: |
-            dist/
-            node_modules/
-            package.json
-            LICENSE
-            README.md
-          retention-days: 90
-  build-docker:
-    name: Build Docker image
+  container:
+    name: Build container
     runs-on: ubuntu-latest
     steps:
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
-      - name: Login to GHCR
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Generate Docker metadata
-        id: meta
-        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6.0.0
-        with:
-          labels: |
-            org.opencontainers.image.title=Atrium
-            org.opencontainers.image.description=Atrium is a self-hosted web app for browsing and managing S3-compatible object storage.
-            org.opencontainers.image.authors=Reinaldy Rafli
-            org.opencontainers.image.url=https://github.com/aldy505/atrium
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=sha
-            type=edge
-      - uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+      - name: Build without publishing
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
         with:
           context: .
-          file: ./Dockerfile
-          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          provenance: true
-          sbom: true
-          platforms: linux/amd64,linux/arm64
+          push: false
+          platforms: linux/amd64

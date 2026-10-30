@@ -1,3 +1,4 @@
+// Modified for Atrium Share. See ATTRIBUTION.md for upstream provenance and changes.
 import { describe, expect, it } from "vitest";
 import {
   getPreviewKind,
@@ -30,5 +31,14 @@ describe("preview mode helpers", () => {
     expect(getPreviewPresentation("text")).toBe("inline");
     expect(getPreviewKind("archive.zip")).toBe("generic");
     expect(getPreviewPresentation("generic")).toBe("inline");
+  });
+
+  it("recognizes common video and audio extensions and MIME types", () => {
+    expect(getPreviewKind("clip.MP4")).toBe("video");
+    expect(getPreviewKind("track.m4a")).toBe("audio");
+    expect(getPreviewKind("download.bin", "video/webm; codecs=vp9")).toBe("video");
+    expect(getPreviewKind("download.bin", "audio/ogg")).toBe("audio");
+    expect(getPreviewPresentation("video")).toBe("inline");
+    expect(getPreviewPresentation("audio")).toBe("inline");
   });
 });

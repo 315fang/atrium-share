@@ -1,3 +1,4 @@
+// Modified for Atrium Share. See ATTRIBUTION.md for upstream provenance and changes.
 import { FastifyInstance } from "fastify";
 import { config } from "./config.js";
 import { OpenFeature } from "@openfeature/server-sdk";
@@ -30,6 +31,8 @@ export function registerRuntimeConfigRoute(app: FastifyInstance): void {
       },
       features: {
         enableS3UriCopy,
+        shareBaseUrl: process.env.SHARE_BASE_URL || undefined,
+        shareBucket: process.env.SHARE_BUCKET || undefined,
       },
     };
 

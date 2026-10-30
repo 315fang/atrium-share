@@ -1,3 +1,4 @@
+// Modified for Atrium Share. See ATTRIBUTION.md for upstream provenance and changes.
 import { useState } from "react";
 
 type LoginFormProps = {
@@ -18,8 +19,8 @@ export const LoginForm = ({ isLoading, error, onSubmit }: LoginFormProps) => {
   return (
     <div className="login-shell">
       <form className="login-card" onSubmit={handleSubmit}>
-        <h1>Atrium</h1>
-        <p>Secure S3 Browser for your object storage.</p>
+        <h1>Atrium Share</h1>
+        <p>安全私有的对象存储(S3)浏览器</p>
 
         <label>
           Access Key ID
@@ -28,6 +29,9 @@ export const LoginForm = ({ isLoading, error, onSubmit }: LoginFormProps) => {
             value={accessKeyId}
             onChange={(event) => setAccessKeyId(event.target.value)}
             autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            autoCorrect="off"
             required
           />
         </label>
@@ -39,6 +43,9 @@ export const LoginForm = ({ isLoading, error, onSubmit }: LoginFormProps) => {
             value={secretAccessKey}
             onChange={(event) => setSecretAccessKey(event.target.value)}
             autoComplete="current-password"
+            autoCapitalize="none"
+            spellCheck={false}
+            autoCorrect="off"
             required
           />
         </label>
@@ -46,7 +53,7 @@ export const LoginForm = ({ isLoading, error, onSubmit }: LoginFormProps) => {
         {error ? <div className="error-banner">{error}</div> : null}
 
         <button type="submit" disabled={isLoading}>
-          {isLoading ? "Authenticating..." : "Sign In"}
+          {isLoading ? "登录中..." : "登录"}
         </button>
       </form>
     </div>

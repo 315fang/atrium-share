@@ -1,3 +1,4 @@
+// Modified for Atrium Share. See ATTRIBUTION.md for upstream provenance and changes.
 import "dotenv/config";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -21,6 +22,12 @@ import { registerS3Routes } from "./routes.js";
 import { closeRedis } from "./session.js";
 import { captureServerError, registerObservabilityHooks, sentryLog } from "./observability.js";
 import { registerRuntimeConfigRoute } from "./runtime-config.js";
+import { registerShortLinkRoutes } from "./short-link.js";
+import { registerShareCollectionRoutes } from "./share-collection.js";
+import { registerMultipartUploadRoutes } from "./upload-multipart.js";
+import { registerObjectIndexRoutes } from "./object-index.js";
+import { registerShareMediaRoutes } from "./share-media.js";
+import { registerArchiveJobRoutes } from "./archive-jobs.js";
 
 // Create providers
 const primaryProvider = new EnvVarProvider({
@@ -38,7 +45,7 @@ const multiProvider = new MultiProvider(
 // Register the multi-provider
 await OpenFeature.setProviderAndWait(multiProvider);
 
-const app = Fastify({ logger: true });
+const app = Fastify({ logger: true, trustProxy: config.TRUST_PROXY_HOPS || false });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -65,6 +72,12 @@ await registerBucketSizeScheduler(app);
 
 // mount shared route helper
 registerRuntimeConfigRoute(app);
+registerShortLinkRoutes(app);
+registerShareCollectionRoutes(app);
+registerMultipartUploadRoutes(app);
+registerObjectIndexRoutes(app);
+registerShareMediaRoutes(app);
+registerArchiveJobRoutes(app);
 
 app.addHook("onClose", async () => {
   await shutdownAuditLogger();

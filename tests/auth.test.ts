@@ -1,3 +1,4 @@
+// Modified for Atrium Share. See ATTRIBUTION.md for upstream provenance and changes.
 import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
 import Fastify from "fastify";
 import cookie from "@fastify/cookie";
@@ -57,7 +58,7 @@ describe("auth", () => {
         clearCookie: vi.fn(),
       } as any;
 
-      await expect(requireSession(request, reply)).rejects.toThrow("Not authenticated");
+      await expect(requireSession(request, reply)).rejects.toThrow("未登录");
     });
 
     it("should throw 401 if session is expired", async () => {
@@ -74,9 +75,7 @@ describe("auth", () => {
         clearCookie: vi.fn(),
       } as any;
 
-      await expect(requireSession(request, reply)).rejects.toThrow(
-        "Session expired. Please log in again.",
-      );
+      await expect(requireSession(request, reply)).rejects.toThrow("会话已过期,请重新登录。");
       expect(reply.clearCookie).toHaveBeenCalledWith(config.COOKIE_NAME, { path: "/" });
     });
 
@@ -225,7 +224,7 @@ describe("auth", () => {
 
       expect(response.statusCode).toBe(401);
       const body = JSON.parse(response.body);
-      expect(body.error).toBe("Not authenticated");
+      expect(body.error).toBe("未登录");
     });
 
     it("should return 401 if session expired", async () => {

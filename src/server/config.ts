@@ -1,3 +1,4 @@
+// Modified for Atrium Share. See ATTRIBUTION.md for upstream provenance and changes.
 import { z } from "zod";
 
 const parseEnvBool = (val: unknown, def: boolean): boolean => {
@@ -14,6 +15,7 @@ const parseEnvBool = (val: unknown, def: boolean): boolean => {
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.coerce.number().default(3000),
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
   REDIS_URL: z.string().min(1),
   S3_LIST_CACHE_ENABLED: z.preprocess((v) => parseEnvBool(v, true), z.boolean()).default(true),
   S3_LIST_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(300),

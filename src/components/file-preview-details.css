@@ -1,0 +1,67 @@
+.owner-file-details .preview-meta-value {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: 72%;
+  text-align: right;
+}
+.owner-file-details small {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: var(--muted-text);
+}
+.owner-file-location {
+  font-size: 0.8rem;
+}
+.owner-preview-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.owner-preview-actions a {
+  display: inline-flex;
+  padding: 9px 12px;
+  border-radius: 8px;
+  color: #fff;
+  background: #1d5dd6;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+.owner-preview-actions a:hover {
+  background: #164bb0;
+}
+.owner-preview-actions a:focus-visible {
+  outline: 2px solid var(--button-primary);
+  outline-offset: 3px;
+}
+.owner-media-details {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: var(--muted-text);
+}
+.owner-media-preview :is(video, audio) {
+  width: 100%;
+  max-height: 55dvh;
+  border-radius: 8px;
+}
+.owner-media-preview video {
+  background: #020617;
+}
+.owner-media-preview p {
+  color: var(--muted-text);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+.owner-file-tags {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  margin-top: 16px;
+}
+.owner-file-tags summary {
+  cursor: pointer;
+  color: var(--muted-text);
+  font-size: 0.85rem;
+}

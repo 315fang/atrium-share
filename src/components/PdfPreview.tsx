@@ -1,6 +1,9 @@
+// Modified for Atrium Share. See ATTRIBUTION.md for upstream provenance and changes.
 import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import "pdfjs-viewer-element";
 import { getDownloadUrl } from "../app/lib/api";
+import { Dialog } from "./Dialog";
+import { useMediaQuery } from "../app/lib/use-media-query";
 
 type PdfPreviewProps = {
   bucket: string;
@@ -52,10 +55,11 @@ const getErrorMessage = (event: unknown): string => {
     return event.source.message;
   }
 
-  return "Failed to load PDF preview.";
+  return "加载 PDF 预览失败。";
 };
 
 export const PdfPreview = ({ bucket, fileKey, fileName, onClose }: PdfPreviewProps) => {
+  const compactLayout = useMediaQuery("(max-width: 768px)");
   const viewerRef = useRef<PdfjsViewerElementInstance | null>(null);
   const [status, setStatus] = useState<ViewerStatus>("loading");
   const [error, setError] = useState<string | null>(null);
@@ -66,19 +70,6 @@ export const PdfPreview = ({ bucket, fileKey, fileName, onClose }: PdfPreviewPro
     setStatus("loading");
     setError(null);
   }, [viewerSrc]);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [onClose]);
 
   useEffect(() => {
     const viewer = viewerRef.current;
@@ -158,24 +149,13 @@ export const PdfPreview = ({ bucket, fileKey, fileName, onClose }: PdfPreviewPro
   }, [viewerSrc]);
 
   return (
-    <div
-      className="modal-overlay pdf-preview-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="pdf-preview-title"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
-    >
+    <Dialog className="pdf-preview-overlay" labelledBy="pdf-preview-title" onClose={onClose}>
       <div className="modal-card pdf-preview-dialog">
         <div className="pdf-preview-header">
           <div>
             <h3 id="pdf-preview-title">{fileName}</h3>
             <p className="pdf-preview-subtitle">
-              PDF preview uses the bundled PDF.js viewer. Password-protected files are supported on
-              a best-effort basis.
+              PDF 预览使用内置 PDF.js 阅读器;受密码保护的文件将尽力支持。
             </p>
           </div>
           <div className="pdf-preview-actions">
@@ -185,10 +165,10 @@ export const PdfPreview = ({ bucket, fileKey, fileName, onClose }: PdfPreviewPro
                 window.location.assign(downloadUrl);
               }}
             >
-              Download PDF
+              下载 PDF
             </button>
             <button type="button" onClick={onClose}>
-              Close
+              关闭
             </button>
           </div>
         </div>
@@ -200,7 +180,7 @@ export const PdfPreview = ({ bucket, fileKey, fileName, onClose }: PdfPreviewPro
               aria-live="polite"
             >
               <span className="spinner" aria-hidden="true" />
-              <p>Loading PDF preview...</p>
+              <p>正在加载 PDF 预览...</p>
             </div>
           ) : null}
           {status === "error" ? (
@@ -212,13 +192,13 @@ export const PdfPreview = ({ bucket, fileKey, fileName, onClose }: PdfPreviewPro
             ref: viewerRef,
             src: viewerSrc,
             zoom: "page-width",
-            pagemode: "thumbs",
-            "iframe-title": `PDF preview for ${fileName}`,
+            pagemode: compactLayout ? "none" : "thumbs",
+            "iframe-title": `PDF 预览:${fileName}`,
             className: "pdf-preview-viewer",
             style: { display: "initial" },
           })}
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 };

@@ -1,3 +1,4 @@
+// Modified for Atrium Share. See ATTRIBUTION.md for upstream provenance and changes.
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -107,7 +108,7 @@ export const isObjectTaggingUnsupported = (error: unknown): boolean => {
   return statusCode === 405 || statusCode === 501;
 };
 
-const getS3Client = (credentials: SessionCredentials): S3Client => {
+export const getS3Client = (credentials: SessionCredentials): S3Client => {
   return new S3Client({
     endpoint: config.S3_ENDPOINT,
     region: config.S3_REGION,
@@ -285,7 +286,12 @@ export const createFolder = async (
   }
 };
 
-export const getObject = async (credentials: SessionCredentials, bucket: string, key: string) => {
+export const getObject = async (
+  credentials: SessionCredentials,
+  bucket: string,
+  key: string,
+  range?: string,
+) => {
   const client = getS3Client(credentials);
   downloadFilesInFlight += 1;
   reportTransferGauges({ bucket });
@@ -298,6 +304,7 @@ export const getObject = async (credentials: SessionCredentials, bucket: string,
           new GetObjectCommand({
             Bucket: bucket,
             Key: key,
+            ...(range ? { Range: range } : {}),
           }),
         ),
       {

@@ -1,3 +1,4 @@
+// Modified for Atrium Share. See ATTRIBUTION.md for upstream provenance and changes.
 // Shared type definitions used by both frontend and backend
 
 export type RuntimeSentryConfig = {
@@ -15,5 +16,7 @@ export type RuntimeConfigResponse = {
   sentry?: RuntimeSentryConfig;
   features?: {
     enableS3UriCopy?: boolean;
+    shareBaseUrl?: string;
+    shareBucket?: string;
   };
 };

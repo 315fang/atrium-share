@@ -1,3 +1,4 @@
+// Modified for Atrium Share. See ATTRIBUTION.md for upstream provenance and changes.
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import hljs from "highlight.js/lib/core";
@@ -17,6 +18,7 @@ import { buildS3Uri, copyTextToClipboard } from "../app/lib/s3-uri";
 import type { FileEntry, ObjectTag } from "../app/lib/types";
 import { getExtension } from "./FileIcon";
 import { getPreviewKind, getPreviewPresentation } from "./preview-mode";
+import "./file-preview-details.css";
 
 hljs.registerLanguage("json", json);
 hljs.registerLanguage("xml", xml);
@@ -102,7 +104,7 @@ const areTagsEqual = (left: EditableTag[], right: EditableTag[]): boolean => {
 
 const validateTags = (tags: EditableTag[]): string | null => {
   if (tags.length > MAX_TAGS) {
-    return `You can only set up to ${MAX_TAGS} tags.`;
+    return `最多只能设置 ${MAX_TAGS} 个标签。`;
   }
 
   const seen = new Set<string>();
@@ -111,19 +113,19 @@ const validateTags = (tags: EditableTag[]): string | null => {
     const key = tag.key.trim();
 
     if (!key) {
-      return "Tag key is required.";
+      return "标签键不能为空。";
     }
 
     if (key.length > MAX_TAG_KEY_LENGTH) {
-      return `Tag keys must be ${MAX_TAG_KEY_LENGTH} characters or less.`;
+      return `标签键不能超过 ${MAX_TAG_KEY_LENGTH} 个字符。`;
     }
 
     if (tag.value.length > MAX_TAG_VALUE_LENGTH) {
-      return `Tag values must be ${MAX_TAG_VALUE_LENGTH} characters or less.`;
+      return `标签值不能超过 ${MAX_TAG_VALUE_LENGTH} 个字符。`;
     }
 
     if (seen.has(key)) {
-      return "Tag keys must be unique.";
+      return "标签键不能重复。";
     }
 
     seen.add(key);
@@ -188,26 +190,53 @@ const formatModified = (lastModified?: string): string => {
 };
 
 type PreviewMetadataProps = {
+  file?: FileEntry | null;
   size?: number;
   lastModified?: string;
   contentType?: string;
 };
 
-const PreviewMetadata = ({ size, lastModified, contentType }: PreviewMetadataProps) => {
+const PreviewMetadata = ({ file, size, lastModified, contentType }: PreviewMetadataProps) => {
+  const timestamp = lastModified ? Date.parse(lastModified) : Number.NaN;
+  const exactDate = Number.isFinite(timestamp) ? new Date(timestamp).toLocaleString() : "时间未知";
   return (
-    <div className="preview-meta" aria-label="File metadata">
+    <div className="preview-meta owner-file-details" aria-label="文件详情">
+      {file ? (
+        <div className="preview-meta-row">
+          <span className="preview-meta-label">文件名</span>
+          <span className="preview-meta-value">{file.name}</span>
+        </div>
+      ) : null}
       <div className="preview-meta-row">
-        <span className="preview-meta-label">Size</span>
-        <span className="preview-meta-value">{formatSize(size)}</span>
+        <span className="preview-meta-label">大小</span>
+        <span className="preview-meta-value">
+          {formatSize(size)}
+          {typeof size === "number" ? <small>{size.toLocaleString()} 字节</small> : null}
+        </span>
       </div>
       <div className="preview-meta-row">
-        <span className="preview-meta-label">Modified</span>
-        <span className="preview-meta-value">{formatModified(lastModified)}</span>
+        <span className="preview-meta-label">上传时间</span>
+        <span className="preview-meta-value" title={exactDate}>
+          {exactDate}
+          <small>{formatModified(lastModified)}</small>
+        </span>
       </div>
+      {file ? (
+        <div className="preview-meta-row">
+          <span className="preview-meta-label">位置</span>
+          <span className="preview-meta-value owner-file-location">{file.key}</span>
+        </div>
+      ) : null}
       <div className="preview-meta-row">
-        <span className="preview-meta-label">Type</span>
+        <span className="preview-meta-label">类型</span>
         <span className="preview-meta-value">{contentType || "application/octet-stream"}</span>
       </div>
+      {file && getExtension(file.name) ? (
+        <div className="preview-meta-row">
+          <span className="preview-meta-label">格式</span>
+          <span className="preview-meta-value">{getExtension(file.name).toUpperCase()}</span>
+        </div>
+      ) : null}
     </div>
   );
 };
@@ -221,6 +250,12 @@ export const FilePreview = ({
   const [textContent, setTextContent] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [mediaDetails, setMediaDetails] = useState<{
+    duration?: number;
+    width?: number;
+    height?: number;
+  }>({});
+  const [tagsExpanded, setTagsExpanded] = useState(false);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
   const [editableTags, setEditableTags] = useState<EditableTag[]>([]);
   const [initialTags, setInitialTags] = useState<EditableTag[]>([]);
@@ -240,7 +275,7 @@ export const FilePreview = ({
   const tagsQuery = useQuery({
     queryKey: ["object-tags", bucket, fileEntry?.key],
     queryFn: () => getObjectTags(bucket, fileEntry!.key),
-    enabled: Boolean(fileEntry && bucket),
+    enabled: Boolean(fileEntry && bucket) && tagsExpanded,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     staleTime: 60_000,
@@ -273,7 +308,7 @@ export const FilePreview = ({
         }
       } catch (loadError) {
         if (isMounted) {
-          setError(loadError instanceof Error ? loadError.message : "Failed to preview file");
+          setError(loadError instanceof Error ? loadError.message : "预览文件失败");
         }
       } finally {
         if (isMounted) {
@@ -305,7 +340,9 @@ export const FilePreview = ({
 
   useEffect(() => {
     setCopyStatus("idle");
-  }, [file?.key]);
+    setMediaDetails({});
+    setTagsExpanded(false);
+  }, [bucket, file?.key]);
 
   useEffect(() => {
     setTagFeedback(null);
@@ -346,7 +383,7 @@ export const FilePreview = ({
   const isTagsLoading = tagsQuery.isPending || (tagsQuery.isFetching && !hasLoadedTags);
   const isTaggingSupported = hasLoadedTags && Boolean(tagsQuery.data?.isSupported);
   const tagQueryError =
-    tagsQuery.error instanceof Error ? tagsQuery.error.message : "Failed to load tags.";
+    tagsQuery.error instanceof Error ? tagsQuery.error.message : "加载标签失败。";
   const tagValidationError = validateTags(editableTags);
   const tagsChanged = !areTagsEqual(editableTags, initialTags);
   const canAddTag =
@@ -357,7 +394,7 @@ export const FilePreview = ({
   if (!file) {
     return (
       <div className="preview-empty center-feedback">
-        <p>Select a file to preview</p>
+        <p>选择文件以预览</p>
       </div>
     );
   }
@@ -375,7 +412,7 @@ export const FilePreview = ({
 
   const copyButton = canCopyS3Uri ? (
     <button type="button" onClick={() => void handleCopyS3Uri()}>
-      {copyStatus === "copied" ? "Copied!" : "Copy S3 URI"}
+      {copyStatus === "copied" ? "已复制!" : "复制 S3 URI"}
     </button>
   ) : null;
 
@@ -420,11 +457,11 @@ export const FilePreview = ({
         setEditableTags(mappedTags);
         setInitialTags(mappedTags);
       }
-      setTagFeedback({ type: "success", message: "Tags saved." });
+      setTagFeedback({ type: "success", message: "标签已保存。" });
     } catch (saveError) {
       setTagFeedback({
         type: "error",
-        message: saveError instanceof Error ? saveError.message : "Failed to save tags.",
+        message: saveError instanceof Error ? saveError.message : "保存标签失败。",
       });
     } finally {
       setIsSavingTags(false);
@@ -432,102 +469,184 @@ export const FilePreview = ({
   };
 
   const tagsSection = fileEntry ? (
-    <section className="preview-tags" aria-label="Object tags">
-      <div className="preview-tags-header">
-        <h4>Tags</h4>
-        <button type="button" onClick={handleAddTag} disabled={!canAddTag}>
-          Add Tag
-        </button>
+    <details
+      className="owner-file-tags"
+      open={tagsExpanded}
+      onToggle={(event) => setTagsExpanded(event.currentTarget.open)}
+    >
+      <summary>高级信息与标签</summary>
+      <section className="preview-tags" aria-label="对象标签">
+        <div className="preview-tags-header">
+          <h4>标签</h4>
+          <button type="button" onClick={handleAddTag} disabled={!canAddTag}>
+            添加标签
+          </button>
+        </div>
+        {isTagsLoading ? <p className="preview-tags-note">正在加载标签...</p> : null}
+        {tagsQuery.isError ? <p className="preview-tags-error">{tagQueryError}</p> : null}
+        {hasLoadedTags && isTaggingSupported && editableTags.length === 0 ? (
+          <p className="preview-tags-note">还没有标签,点「添加标签」开始。</p>
+        ) : null}
+        {hasLoadedTags && isTaggingSupported ? (
+          <div className="preview-tags-list">
+            {editableTags.map((tag, index) => (
+              <div className="preview-tags-row" key={tag.id}>
+                <input
+                  type="text"
+                  value={tag.key}
+                  placeholder="键"
+                  aria-label={`标签键 ${index + 1}`}
+                  maxLength={MAX_TAG_KEY_LENGTH}
+                  disabled={isSavingTags}
+                  onChange={(event) => {
+                    handleChangeTag(tag.id, "key", event.target.value);
+                  }}
+                />
+                <input
+                  type="text"
+                  value={tag.value}
+                  placeholder="值"
+                  aria-label={`标签值 ${index + 1}`}
+                  maxLength={MAX_TAG_VALUE_LENGTH}
+                  disabled={isSavingTags}
+                  onChange={(event) => {
+                    handleChangeTag(tag.id, "value", event.target.value);
+                  }}
+                />
+                <button
+                  type="button"
+                  aria-label={`移除标签 ${tag.key.trim() || index + 1}`}
+                  onClick={() => {
+                    handleRemoveTag(tag.id);
+                  }}
+                  disabled={isSavingTags}
+                >
+                  移除
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {hasLoadedTags && !isTaggingSupported ? (
+          <p className="preview-tags-note">
+            {tagsQuery.data?.unsupportedReason || "当前存储服务或凭据不支持对象标签。"}
+          </p>
+        ) : null}
+        {tagValidationError ? (
+          <p className="preview-tags-error" role="alert">
+            {tagValidationError}
+          </p>
+        ) : null}
+        {tagFeedback ? (
+          <p
+            className={tagFeedback.type === "error" ? "preview-tags-error" : "preview-tags-success"}
+            role={tagFeedback.type === "error" ? "alert" : undefined}
+            aria-live="polite"
+          >
+            {tagFeedback.message}
+          </p>
+        ) : null}
+        <div className="preview-tags-actions">
+          <button type="button" onClick={() => void handleSaveTags()} disabled={!canSaveTags}>
+            {isSavingTags ? "保存中..." : "保存标签"}
+          </button>
+        </div>
+      </section>
+    </details>
+  ) : null;
+
+  const duration = mediaDetails.duration;
+  const durationLabel =
+    typeof duration === "number" && Number.isFinite(duration)
+      ? `${duration >= 3600 ? `${Math.floor(duration / 3600)}:` : ""}${String(Math.floor(duration / 60) % 60).padStart(duration >= 3600 ? 2 : 1, "0")}:${String(Math.floor(duration % 60)).padStart(2, "0")}`
+      : "";
+  const fileDetails = (
+    <>
+      <h3>{file.name}</h3>
+      <div className="owner-preview-actions">
+        <a href={getDownloadUrl(bucket, file.key)} download={file.name}>
+          下载到设备
+        </a>
+        {copyButton}
       </div>
-      {isTagsLoading ? <p className="preview-tags-note">Loading tags...</p> : null}
-      {tagsQuery.isError ? <p className="preview-tags-error">{tagQueryError}</p> : null}
-      {hasLoadedTags && isTaggingSupported && editableTags.length === 0 ? (
-        <p className="preview-tags-note">No tags yet. Add a tag to get started.</p>
-      ) : null}
-      {hasLoadedTags && isTaggingSupported ? (
-        <div className="preview-tags-list">
-          {editableTags.map((tag, index) => (
-            <div className="preview-tags-row" key={tag.id}>
-              <input
-                type="text"
-                value={tag.key}
-                placeholder="Key"
-                aria-label={`Tag key ${index + 1}`}
-                maxLength={MAX_TAG_KEY_LENGTH}
-                disabled={isSavingTags}
-                onChange={(event) => {
-                  handleChangeTag(tag.id, "key", event.target.value);
-                }}
-              />
-              <input
-                type="text"
-                value={tag.value}
-                placeholder="Value"
-                aria-label={`Tag value ${index + 1}`}
-                maxLength={MAX_TAG_VALUE_LENGTH}
-                disabled={isSavingTags}
-                onChange={(event) => {
-                  handleChangeTag(tag.id, "value", event.target.value);
-                }}
-              />
-              <button
-                type="button"
-                aria-label={`Remove tag ${tag.key.trim() || index + 1}`}
-                onClick={() => {
-                  handleRemoveTag(tag.id);
-                }}
-                disabled={isSavingTags}
-              >
-                Remove
-              </button>
-            </div>
-          ))}
+      <PreviewMetadata
+        file={file}
+        size={metadataSize}
+        lastModified={metadataLastModified}
+        contentType={metadataContentType}
+      />
+      {mediaDetails.width || durationLabel ? (
+        <div className="owner-media-details">
+          {mediaDetails.width && mediaDetails.height ? (
+            <span>
+              尺寸 {mediaDetails.width} × {mediaDetails.height}
+            </span>
+          ) : null}
+          {durationLabel ? <span>时长 {durationLabel}</span> : null}
         </div>
       ) : null}
-      {hasLoadedTags && !isTaggingSupported ? (
-        <p className="preview-tags-note">
-          {tagsQuery.data?.unsupportedReason ||
-            "Object tagging is unavailable for this provider or current credentials."}
-        </p>
-      ) : null}
-      {tagValidationError ? (
-        <p className="preview-tags-error" role="alert">
-          {tagValidationError}
-        </p>
-      ) : null}
-      {tagFeedback ? (
-        <p
-          className={tagFeedback.type === "error" ? "preview-tags-error" : "preview-tags-success"}
-          role={tagFeedback.type === "error" ? "alert" : undefined}
-          aria-live="polite"
-        >
-          {tagFeedback.message}
-        </p>
-      ) : null}
-      <div className="preview-tags-actions">
-        <button type="button" onClick={() => void handleSaveTags()} disabled={!canSaveTags}>
-          {isSavingTags ? "Saving..." : "Save Tags"}
-        </button>
+    </>
+  );
+
+  if (previewKind === "video" || previewKind === "audio") {
+    const recordMediaDetails = (element: HTMLMediaElement) =>
+      setMediaDetails({
+        duration: element.duration,
+        ...(element instanceof HTMLVideoElement
+          ? { width: element.videoWidth, height: element.videoHeight }
+          : {}),
+      });
+    return (
+      <div className="preview-panel">
+        {fileDetails}
+        <div className="owner-media-preview" key={file.key}>
+          {previewKind === "video" ? (
+            <video
+              src={getDownloadUrl(bucket, file.key, true)}
+              controls
+              playsInline
+              preload="metadata"
+              onLoadedMetadata={(event) => recordMediaDetails(event.currentTarget)}
+              onError={() => setError("当前浏览器无法播放此格式，可以下载后打开。")}
+            />
+          ) : (
+            <audio
+              src={getDownloadUrl(bucket, file.key, true)}
+              controls
+              preload="metadata"
+              onLoadedMetadata={(event) => recordMediaDetails(event.currentTarget)}
+              onError={() => setError("当前浏览器无法播放此格式，可以下载后打开。")}
+            />
+          )}
+          {error ? (
+            <p role="status">{error}</p>
+          ) : (
+            <p>点击播放即可预览，下载时请点击“下载到设备”。</p>
+          )}
+        </div>
+        {tagsSection}
       </div>
-    </section>
-  ) : null;
+    );
+  }
 
   if (previewKind === "image") {
     return (
       <div className="preview-panel">
-        <h3>{file.name}</h3>
-        {copyButton}
-        <PreviewMetadata
-          size={metadataSize}
-          lastModified={metadataLastModified}
-          contentType={metadataContentType}
-        />
-        {tagsSection}
+        {fileDetails}
         <img
           src={getDownloadUrl(bucket, file.key, true)}
           alt={file.name}
           className="preview-image"
+          onLoad={(event) =>
+            setMediaDetails({
+              width: event.currentTarget.naturalWidth,
+              height: event.currentTarget.naturalHeight,
+            })
+          }
+          onError={() => setError("图片暂时无法显示，可以下载后查看。")}
         />
+        {error ? <p role="status">{error}</p> : null}
+        {tagsSection}
       </div>
     );
   }
@@ -535,18 +654,11 @@ export const FilePreview = ({
   if (previewKind === "text") {
     return (
       <div className="preview-panel">
-        <h3>{file.name}</h3>
-        {copyButton}
-        <PreviewMetadata
-          size={metadataSize}
-          lastModified={metadataLastModified}
-          contentType={metadataContentType}
-        />
-        {tagsSection}
+        {fileDetails}
         {isLoading ? (
           <div className="center-feedback status-banner" aria-live="polite">
             <span className="spinner" aria-hidden="true" />
-            <p>Loading preview...</p>
+            <p>正在加载预览...</p>
           </div>
         ) : null}
         {error ? (
@@ -559,6 +671,7 @@ export const FilePreview = ({
             <pre className="preview-text" dangerouslySetInnerHTML={{ __html: highlighted }} />
           </div>
         ) : null}
+        {tagsSection}
       </div>
     );
   }
@@ -567,19 +680,9 @@ export const FilePreview = ({
     return (
       <>
         <div className="preview-panel">
-          <h3>{file.name}</h3>
-          {copyButton}
-          <PreviewMetadata
-            size={metadataSize}
-            lastModified={metadataLastModified}
-            contentType={metadataContentType}
-          />
-          {tagsSection}
+          {fileDetails}
           <div className="status-banner preview-pdf-card">
-            <p>
-              Open the PDF in a larger viewer when you need full-width reading with page navigation,
-              thumbnails, search, and zoom.
-            </p>
+            <p>在 PDF 阅读器中查看，可搜索内容、缩放和翻页。</p>
             <div className="preview-pdf-actions">
               <button
                 type="button"
@@ -587,18 +690,11 @@ export const FilePreview = ({
                   onOpenPdfPreview?.(fileEntry);
                 }}
               >
-                Open PDF viewer
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  window.location.assign(getDownloadUrl(bucket, file.key));
-                }}
-              >
-                Download PDF
+                打开 PDF 阅读器
               </button>
             </div>
           </div>
+          {tagsSection}
         </div>
       </>
     );
@@ -606,15 +702,9 @@ export const FilePreview = ({
 
   return (
     <div className="preview-panel">
-      <h3>{file.name}</h3>
-      {copyButton}
-      <PreviewMetadata
-        size={metadataSize}
-        lastModified={metadataLastModified}
-        contentType={metadataContentType}
-      />
+      {fileDetails}
+      <p>该文件类型暂不支持预览。</p>
       {tagsSection}
-      <p>No preview available for this file type.</p>
     </div>
   );
 };

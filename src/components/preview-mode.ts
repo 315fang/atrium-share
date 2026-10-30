@@ -1,6 +1,7 @@
-import { isImageFile, isPdfFile, isTextFile } from "./FileIcon";
+// Modified for Atrium Share. See ATTRIBUTION.md for upstream provenance and changes.
+import { getExtension, isImageFile, isPdfFile, isTextFile } from "./FileIcon";
 
-export type PreviewKind = "image" | "text" | "pdf" | "generic";
+export type PreviewKind = "image" | "video" | "audio" | "text" | "pdf" | "generic";
 export type PreviewPresentation = "inline" | "modal-trigger";
 
 export const isPdfContentType = (contentType?: string): boolean => {
@@ -12,6 +13,8 @@ export const isPdfContentType = (contentType?: string): boolean => {
 };
 
 export const getPreviewKind = (filename: string, contentType?: string): PreviewKind => {
+  const type = contentType?.split(";")[0]?.trim().toLowerCase() || "";
+  const extension = getExtension(filename);
   if (isImageFile(filename)) {
     return "image";
   }
@@ -19,6 +22,10 @@ export const getPreviewKind = (filename: string, contentType?: string): PreviewK
   if (isPdfFile(filename) || isPdfContentType(contentType)) {
     return "pdf";
   }
+
+  if (type.startsWith("video/") || /^(mp4|webm|mov|m4v|ogv|mkv)$/.test(extension)) return "video";
+  if (type.startsWith("audio/") || /^(mp3|wav|ogg|m4a|aac|flac|opus)$/.test(extension))
+    return "audio";
 
   if (isTextFile(filename)) {
     return "text";

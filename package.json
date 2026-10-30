@@ -1,7 +1,17 @@
 {
-  "name": "atrium",
-  "version": "0.1.0",
+  "name": "atrium-share",
+  "version": "0.2.0",
   "private": true,
+  "description": "Self-hosted S3 file sharing with preview pages, short links and resumable uploads",
+  "homepage": "https://github.com/315fang/atrium-share#readme",
+  "bugs": {
+    "url": "https://github.com/315fang/atrium-share/issues"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/315fang/atrium-share.git"
+  },
   "type": "module",
   "scripts": {
     "dev": "concurrently \"vite\" \"tsx watch --import ./src/server/sentry.server.ts src/server/index.ts\"",
@@ -34,7 +44,10 @@
     "ioredis": "^5.11.1",
     "mime-types": "^3.0.2",
     "pdfjs-viewer-element": "^3.2.2",
+    "qrcode": "^1.5.4",
+    "sharp": "^0.34.5",
     "toad-scheduler": "^3.1.0",
+    "yazl": "^3.3.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -44,12 +57,15 @@
     "@tanstack/react-virtual": "^3.14.9",
     "@types/mime-types": "^3.0.1",
     "@types/node": "^24.13.3",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
+    "@types/yazl": "^3.3.0",
     "@vitejs/plugin-react": "^6.0.5",
     "@vitest/coverage-v8": "^4.1.10",
     "@vitest/ui": "^4.1.10",
     "concurrently": "^9.2.4",
+    "happy-dom": "^21.0.4",
     "highlight.js": "^11.11.1",
     "oxfmt": "^0.61.0",
     "oxlint": "^1.76.0",
@@ -60,10 +76,8 @@
     "vite": "^8.2.0",
     "vitest": "^4.1.10"
   },
-  "packageManager": "pnpm@10.34.5",
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
-  }
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@10.34.5"
 }

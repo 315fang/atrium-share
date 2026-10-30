@@ -1,4 +1,6 @@
+// Modified for Atrium Share. See ATTRIBUTION.md for upstream provenance and changes.
 import { useMemo, useState } from "react";
+import { Dialog } from "./Dialog";
 
 type CreateFolderDialogProps = {
   bucket: string;
@@ -14,19 +16,19 @@ const getValidationError = (value: string): string | null => {
   const trimmed = value.trim();
 
   if (!trimmed) {
-    return "Folder name is required.";
+    return "文件夹名不能为空。";
   }
 
   if (trimmed === "." || trimmed === "..") {
-    return "Folder name cannot be . or ..";
+    return "文件夹名不能是 . 或 ..";
   }
 
   if (trimmed.includes("/") || trimmed.includes("\\")) {
-    return "Folder name cannot contain / or backslash.";
+    return "文件夹名不能包含 / 或反斜杠。";
   }
 
   if (trimmed.length > MAX_FOLDER_NAME_LENGTH) {
-    return "Folder name is too long.";
+    return "文件夹名过长。";
   }
 
   return null;
@@ -58,22 +60,22 @@ export const CreateFolderDialog = ({
     try {
       await onCreate(value.trim());
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : "Failed to create folder");
+      setError(createError instanceof Error ? createError.message : "创建文件夹失败");
     }
   };
 
   return (
-    <div
-      className="modal-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="create-folder-title"
+    <Dialog
+      labelledBy="create-folder-title"
+      onClose={() => {
+        if (!isLoading) onCancel();
+      }}
     >
       <div className="modal-card">
-        <h3 id="create-folder-title">Create folder</h3>
+        <h3 id="create-folder-title">新建文件夹</h3>
         <form className="modal-form" onSubmit={handleSubmit}>
           <label className="modal-field">
-            <span>Folder name</span>
+            <span>文件夹名</span>
             <input
               type="text"
               value={value}
@@ -84,10 +86,10 @@ export const CreateFolderDialog = ({
               onBlur={() => setTouched(true)}
               autoFocus
               disabled={isLoading}
-              placeholder="e.g. invoices"
+              placeholder="例如 invoices"
             />
           </label>
-          <p className="modal-hint">Location: {locationLabel || "(select a bucket)"}</p>
+          <p className="modal-hint">位置:{locationLabel || "(请先选择存储桶)"}</p>
           {touched && validationError ? (
             <p className="modal-error" role="alert">
               {validationError}
@@ -100,14 +102,14 @@ export const CreateFolderDialog = ({
           ) : null}
           <div className="modal-actions">
             <button type="button" onClick={onCancel} disabled={isLoading}>
-              Cancel
+              取消
             </button>
             <button type="submit" disabled={Boolean(validationError) || isLoading}>
-              {isLoading ? "Creating..." : "Create"}
+              {isLoading ? "创建中..." : "创建"}
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </Dialog>
   );
 };

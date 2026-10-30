@@ -1,3 +1,6 @@
+// Modified for Atrium Share. See ATTRIBUTION.md for upstream provenance and changes.
+import { Dialog } from "./Dialog";
+
 type ConfirmDialogProps = {
   title: string;
   message: string;
@@ -14,13 +17,18 @@ export const ConfirmDialog = ({
   onCancel,
 }: ConfirmDialogProps) => {
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true">
+    <Dialog
+      labelledBy="confirm-dialog-title"
+      onClose={() => {
+        if (!isLoading) onCancel();
+      }}
+    >
       <div className="modal-card">
-        <h3>{title}</h3>
+        <h3 id="confirm-dialog-title">{title}</h3>
         <p>{message}</p>
         <div className="modal-actions">
           <button type="button" onClick={onCancel} disabled={isLoading}>
-            Cancel
+            取消
           </button>
           <button
             type="button"
@@ -28,10 +36,10 @@ export const ConfirmDialog = ({
             onClick={() => void onConfirm()}
             disabled={isLoading}
           >
-            {isLoading ? "Deleting..." : "Confirm"}
+            {isLoading ? "删除中..." : "确认"}
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 };

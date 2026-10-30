@@ -1,3 +1,4 @@
+// Modified for Atrium Share. See ATTRIBUTION.md for upstream provenance and changes.
 export type FolderEntry = {
   type: "folder";
   key: string;
@@ -21,6 +22,9 @@ export type ListObjectsResponse = {
   isTruncated: boolean;
   folders: FolderEntry[];
   files: FileEntry[];
+  indexing?: boolean;
+  indexedAt?: number | null;
+  indexError?: string;
 };
 
 export type ObjectMetadataResponse = {
@@ -59,7 +63,14 @@ export type UploadSelection = {
   emptyFolders: string[];
 };
 
-export type UploadTaskStatus = "queued" | "uploading" | "success" | "error" | "canceled";
+export type UploadTaskStatus =
+  | "queued"
+  | "uploading"
+  | "paused"
+  | "success"
+  | "skipped"
+  | "error"
+  | "canceled";
 
 export type UploadTask = {
   id: string;
@@ -69,6 +80,16 @@ export type UploadTask = {
   percent: number;
   status: UploadTaskStatus;
   error?: string;
+  conflict?: "keep-both" | "skip" | "replace";
+  bytesPerSecond?: number;
+  etaSeconds?: number;
+  /** 上传成功后服务端返回的对象 key，用于生成分享/下载链接。 */
+  key?: string;
+  /** 该任务写入的存储桶，用于判断是否属于分享桶。 */
+  bucket?: string;
+  prefix?: string;
+  lastModified?: string;
+  contentType?: string;
 };
 
 export type BucketSizeResponse = {

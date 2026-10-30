@@ -1,3 +1,4 @@
+/* Modified for Atrium Share. See ATTRIBUTION.md for upstream provenance and changes. */
 :root {
   color-scheme: light dark;
   font-family:
@@ -701,13 +702,13 @@ input:focus-visible {
 }
 
 .layout {
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 260px minmax(0, 1fr);
   gap: 1rem;
   padding: 1rem;
 }
 
 .layout-with-preview {
-  grid-template-columns: 260px 1fr 380px;
+  grid-template-columns: 260px minmax(0, 1fr) 380px;
 }
 
 .sidebar,
@@ -1169,5 +1170,620 @@ input:focus-visible {
   .pdf-preview-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+}
+/* Responsive product layout: keep these after the desktop refresh. */
+body,
+.login-shell,
+.centered,
+.layout {
+  min-height: 100dvh;
+}
+
+.sidebar,
+.main-panel,
+.toolbar-location,
+.toolbar-actions,
+.content-panel,
+.preview-column,
+.preview-panel,
+.preview-body {
+  min-width: 0;
+}
+
+.toolbar {
+  flex-wrap: wrap;
+}
+
+.toolbar-location {
+  flex: 1 1 16rem;
+}
+
+.toolbar-actions {
+  flex: 1 1 30rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.toolbar-actions .file-search {
+  flex: 1 1 12rem;
+  min-width: 0;
+  width: auto;
+}
+
+.browser-tools {
+  flex-basis: 100%;
+  min-width: 0;
+}
+
+.browser-tools > summary,
+.dropzone-mobile-hint {
+  display: none;
+}
+
+.browser-tools > .browser-tools-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.browser-tools-content select {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.upload-dropzone {
+  flex-wrap: wrap;
+}
+
+.upload-item-main {
+  flex: 1;
+}
+
+.upload-list {
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.upload-summary > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.upload-item-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 50%;
+}
+
+.upload-item-error,
+.error-banner,
+.status-banner,
+.modal-card p,
+.preview-panel h3,
+.pdf-preview-header h3,
+.sidebar .bucket {
+  overflow-wrap: anywhere;
+}
+
+.object-table {
+  table-layout: fixed;
+}
+
+.object-table th:first-child {
+  width: 40%;
+}
+.object-table th:nth-child(2) {
+  width: 13%;
+}
+.object-table th:nth-child(3) {
+  width: 18%;
+}
+.object-table th:last-child {
+  width: 29%;
+}
+.table-actions {
+  flex-wrap: wrap;
+}
+.name-button {
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+.name-text {
+  min-width: 0;
+}
+.file-icon {
+  flex-shrink: 0;
+}
+.file-metadata {
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+}
+
+.preview-column {
+  grid-column: auto;
+}
+.preview-column-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 0.8rem 1rem;
+  background: var(--panel-strong-bg);
+  border-bottom: 1px solid var(--border);
+}
+.preview-panel {
+  height: auto;
+  min-height: 0;
+}
+.preview-panel > h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+.preview-image {
+  height: auto;
+  max-height: 60dvh;
+  object-fit: contain;
+}
+.preview-meta-value {
+  min-width: 0;
+}
+.preview-tags-row input {
+  width: 100%;
+  min-width: 0;
+}
+.preview-tags-row input {
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  color: var(--text);
+  background: var(--panel-soft-bg);
+}
+
+.modal-overlay {
+  z-index: 30;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+}
+.modal-card {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  min-width: 0;
+}
+.modal-actions {
+  flex-wrap: wrap;
+}
+.modal-field input {
+  width: 100%;
+  min-width: 0;
+}
+.pdf-preview-overlay {
+  z-index: 40;
+}
+.pdf-preview-dialog {
+  height: min(96dvh, 1200px);
+  overflow: hidden;
+}
+.pdf-preview-header > div {
+  min-width: 0;
+}
+.pdf-preview-header h3 {
+  font-size: 1rem;
+}
+
+select:focus-visible,
+summary:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--button-primary);
+  outline-offset: 3px;
+}
+
+@media (max-width: 1100px) {
+  .layout,
+  .layout.layout-with-preview {
+    grid-template-columns: 200px minmax(0, 1fr);
+    align-items: start;
+  }
+  .sidebar {
+    min-height: calc(100dvh - 1.5rem);
+  }
+  .main-panel {
+    display: flex;
+    flex-direction: column;
+  }
+  .toolbar {
+    flex-direction: column;
+  }
+  .toolbar-location,
+  .toolbar-actions {
+    flex: initial;
+    width: 100%;
+  }
+  .preview-column {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    width: 100%;
+    height: 100dvh;
+    grid-column: auto;
+    border: 0;
+    border-radius: 0;
+    background: var(--panel-strong-bg);
+    overscroll-behavior: contain;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+      env(safe-area-inset-left);
+  }
+  .preview-panel {
+    max-width: 900px;
+    margin-inline: auto;
+  }
+  .preview-image {
+    max-height: 65dvh;
+  }
+  .object-table th:first-child {
+    width: 38%;
+  }
+  .object-table th:nth-child(2) {
+    width: 14%;
+  }
+  .object-table th:nth-child(3) {
+    width: 18%;
+  }
+  .object-table th:last-child {
+    width: 30%;
+  }
+}
+
+@media (max-width: 768px) {
+  body {
+    font-size: 16px;
+  }
+  .layout,
+  .layout.layout-with-preview {
+    grid-template-columns: minmax(0, 1fr);
+    padding: max(0.5rem, env(safe-area-inset-top)) max(0.5rem, env(safe-area-inset-right))
+      max(0.5rem, env(safe-area-inset-bottom)) max(0.5rem, env(safe-area-inset-left));
+    gap: 0.5rem;
+  }
+  button,
+  select,
+  input:not([type="checkbox"]),
+  summary {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  button {
+    touch-action: manipulation;
+  }
+  button:hover {
+    transform: none;
+  }
+  .sidebar {
+    min-height: 0;
+    padding: 0.65rem 0.75rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.5rem;
+  }
+  .sidebar-header {
+    gap: 0.5rem;
+  }
+  .sidebar-header h2 {
+    font-size: 0.85rem;
+  }
+  .sidebar-header button {
+    padding-inline: 0.6rem;
+  }
+  .sidebar .logout {
+    margin: 0;
+    font-size: 0.85rem;
+  }
+  .bucket-list {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-bottom: 0.15rem;
+  }
+  .bucket {
+    flex: 0 0 auto;
+    max-width: 80%;
+  }
+  .main-panel {
+    padding: 0.8rem;
+    gap: 0.8rem;
+  }
+  .toolbar {
+    gap: 0.65rem;
+  }
+  .toolbar h1 {
+    font-size: 1.15rem;
+  }
+  .toolbar-note {
+    font-size: 0.78rem;
+    line-height: 1.5;
+  }
+  .toolbar-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+  .toolbar-actions .file-search {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  .browser-tools {
+    grid-column: 1 / -1;
+  }
+  .browser-tools > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: 0.7rem;
+    cursor: pointer;
+    list-style: none;
+    color: var(--muted-text);
+  }
+  .browser-tools > summary::-webkit-details-marker {
+    display: none;
+  }
+  .browser-tools > summary::after {
+    content: "+";
+    font-size: 1.2rem;
+  }
+  .browser-tools[open] > summary::after {
+    content: "−";
+  }
+  .browser-tools:not([open]) > .browser-tools-content {
+    display: none;
+  }
+  .browser-tools[open] > .browser-tools-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    padding-block: 0.5rem;
+  }
+  .auto-load-toggle {
+    min-height: 44px;
+    padding-inline: 0.5rem;
+  }
+  .auto-load-toggle input {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+  }
+  .breadcrumbs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    margin-top: 0.2rem;
+    max-width: 100%;
+    gap: 0.1rem;
+  }
+  .breadcrumbs > span {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .breadcrumbs button {
+    flex-shrink: 0;
+    padding-inline: 0.3rem;
+    white-space: nowrap;
+  }
+  .breadcrumbs [aria-current="page"] {
+    color: var(--text);
+  }
+  .dropzone-desktop-hint {
+    display: none;
+  }
+  .dropzone-mobile-hint {
+    display: block;
+    flex-basis: 100%;
+    color: var(--muted-text);
+    font-size: 0.85rem;
+  }
+  .upload-dropzone {
+    padding: 0.75rem;
+    gap: 0.5rem;
+  }
+  .upload-dropzone > button {
+    flex: 1 1 7rem;
+  }
+  .upload-item {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .upload-item-main {
+    flex-basis: 60%;
+  }
+  .upload-item-path {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .upload-item-actions {
+    max-width: 100%;
+  }
+  .upload-item-error {
+    flex-basis: 100%;
+    font-size: 0.8rem;
+  }
+  .upload-summary {
+    font-size: 0.85rem;
+  }
+  .object-table-wrap {
+    height: clamp(280px, 58dvh, 700px);
+  }
+  .object-table,
+  .object-table tbody {
+    display: block;
+    width: 100%;
+  }
+  .object-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .object-table tbody tr:not(.virtual-spacer) {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    gap: 0.2rem 0.5rem;
+    padding: 0.65rem 0.7rem;
+    border-bottom: 1px solid var(--table-row-border);
+  }
+  .object-table td {
+    display: block;
+    border: 0;
+    padding: 0;
+    min-width: 0;
+  }
+  .object-table td:first-child,
+  .object-table td:last-child {
+    grid-column: 1 / -1;
+  }
+  .object-table .file-metadata {
+    color: var(--muted-text);
+    font-size: 0.78rem;
+  }
+  .file-metadata[data-label]::before {
+    content: attr(data-label) " ";
+  }
+  .name-button {
+    min-height: 44px;
+    max-width: 100%;
+    font-size: 0.95rem;
+  }
+  .name-text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.45;
+  }
+  .table-actions {
+    display: flex;
+    gap: 0.4rem;
+    padding-top: 0.4rem;
+  }
+  .table-actions > button {
+    flex: 1;
+    padding-inline: 0.4rem;
+    font-size: 0.85rem;
+  }
+  .object-table .virtual-spacer {
+    display: block;
+  }
+  .object-table .folder-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+  .object-table .folder-row td:first-child {
+    grid-column: 1;
+  }
+  .object-table .folder-row td:last-child {
+    grid-column: 2;
+  }
+  .folder-row .file-metadata {
+    display: none;
+  }
+  .folder-row .table-actions {
+    padding-top: 0;
+  }
+  .folder-row .table-actions > button {
+    flex: initial;
+    padding-inline: 0.65rem;
+  }
+  .object-table .virtual-spacer td {
+    width: 100%;
+  }
+  .table-progress {
+    font-size: 0.8rem;
+  }
+  .login-shell {
+    padding: 1rem;
+    align-items: start;
+    padding-top: max(3rem, env(safe-area-inset-top));
+  }
+  .login-card {
+    padding: 1.2rem;
+  }
+  .login-card input {
+    width: 100%;
+    min-width: 0;
+  }
+  .preview-column-header {
+    gap: 0.5rem;
+  }
+  .preview-tags-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .preview-tags-row input:first-child {
+    grid-column: 1;
+  }
+  .preview-tags-row input:nth-child(2) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .preview-tags-row button {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  .preview-meta-row {
+    align-items: start;
+  }
+  .preview-meta-value {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    max-width: 70%;
+  }
+  .modal-overlay {
+    align-items: center;
+  }
+  .modal-actions > button {
+    flex: 1 1 auto;
+  }
+  .pdf-preview-overlay {
+    padding: 0;
+  }
+  .pdf-preview-dialog {
+    width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    border: 0;
+    padding: max(0.65rem, env(safe-area-inset-top)) max(0.65rem, env(safe-area-inset-right))
+      max(0.65rem, env(safe-area-inset-bottom)) max(0.65rem, env(safe-area-inset-left));
+    gap: 0.65rem;
+  }
+  .pdf-preview-header {
+    gap: 0.65rem;
+  }
+  .pdf-preview-actions {
+    width: 100%;
+  }
+  .pdf-preview-actions > button {
+    flex: 1;
+  }
+  .pdf-preview-subtitle {
+    font-size: 0.78rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
   }
 }

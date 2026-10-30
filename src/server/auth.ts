@@ -1,3 +1,4 @@
+// Modified for Atrium Share. See ATTRIBUTION.md for upstream provenance and changes.
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { hashAccessKeyId, hashSessionToken, recordAuditEvent } from "./audit/index.js";
@@ -36,7 +37,7 @@ export const requireSession = async (
       result: "failure",
       error: "missing_cookie",
     });
-    throw new AppError("Not authenticated", 401);
+    throw new AppError("未登录", 401);
   }
 
   const sessionCredentials = await getSessionCredentials(token);
@@ -55,7 +56,7 @@ export const requireSession = async (
       result: "failure",
       error: "session_expired",
     });
-    throw new AppError("Session expired. Please log in again.", 401);
+    throw new AppError("会话已过期,请重新登录。", 401);
   }
 
   request.sessionToken = token;
@@ -78,7 +79,7 @@ export const registerAuthRoutes = (app: FastifyInstance): void => {
         error: "invalid_payload",
         durationMs: Date.now() - startedAt,
       });
-      throw new AppError("Invalid login payload", 400, true);
+      throw new AppError("登录信息格式有误", 400, true);
     }
 
     const credentials: SessionCredentials = parsed.data;
@@ -97,11 +98,7 @@ export const registerAuthRoutes = (app: FastifyInstance): void => {
         error: toErrorMessage(error),
         durationMs: Date.now() - startedAt,
       });
-      throw new AppError(
-        `Invalid credentials or provider access denied: ${toErrorMessage(error)}`,
-        401,
-        true,
-      );
+      throw new AppError(`凭据无效或存储服务拒绝访问:${toErrorMessage(error)}`, 401, true);
     }
 
     const token = await createSession(credentials);
@@ -168,7 +165,7 @@ export const registerAuthRoutes = (app: FastifyInstance): void => {
         result: "failure",
         error: "missing_cookie",
       });
-      return reply.code(401).send({ error: "Not authenticated" });
+      return reply.code(401).send({ error: "未登录" });
     }
 
     const sessionCredentials = await getSessionCredentials(token);

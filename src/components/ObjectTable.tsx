@@ -1,3 +1,4 @@
+// Modified for Atrium Share. See ATTRIBUTION.md for upstream provenance and changes.
 import { useEffect, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { FileEntry, FolderEntry } from "../app/lib/types";
@@ -11,6 +12,10 @@ type ObjectTableProps = {
   loadingMore?: boolean;
   scrollStateKey: string;
   initialScrollTop?: number;
+  shareBaseUrl?: string;
+  selectedFileKeys: Set<string>;
+  onToggleFileSelection: (key: string) => void;
+  onShareFile: (file: FileEntry) => void;
   onScrollProgress?: (progress: number) => void;
   onScrollPositionChange?: (scrollTop: number) => void;
   onOpenFolder: (key: string) => void;
@@ -86,6 +91,10 @@ export const ObjectTable = ({
   loadingMore = false,
   scrollStateKey,
   initialScrollTop = 0,
+  shareBaseUrl,
+  selectedFileKeys,
+  onToggleFileSelection,
+  onShareFile,
   onScrollProgress,
   onScrollPositionChange,
   onOpenFolder,
@@ -94,41 +103,6 @@ export const ObjectTable = ({
   onDeleteFile,
   onDownloadFile,
 }: ObjectTableProps) => {
-  if (isInitialLoading) {
-    return (
-      <div className="object-table-wrap">
-        <table className="object-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Size</th>
-              <th>Modified</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Array.from({ length: 10 }, (_, index) => (
-              <tr key={`skeleton-${index}`}>
-                <td>
-                  <span className="skeleton-cell skeleton-name" />
-                </td>
-                <td>
-                  <span className="skeleton-cell skeleton-short" />
-                </td>
-                <td>
-                  <span className="skeleton-cell skeleton-medium" />
-                </td>
-                <td>
-                  <span className="skeleton-cell skeleton-short" />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  }
-
   const normalized = filter.toLowerCase();
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
   const appliedScrollKeyRef = useRef<string | null>(null);
@@ -172,7 +146,7 @@ export const ObjectTable = ({
       element.scrollTop = initialScrollTop;
       appliedScrollKeyRef.current = scrollStateKey;
     }
-  }, [initialScrollTop, scrollStateKey]);
+  }, [initialScrollTop, scrollStateKey, isInitialLoading]);
 
   useEffect(() => {
     const element = tableScrollRef.current;
@@ -195,10 +169,49 @@ export const ObjectTable = ({
     return () => {
       element.removeEventListener("scroll", handleScroll);
     };
-  }, [onScrollPositionChange, onScrollProgress, rows.length]);
+  }, [onScrollPositionChange, onScrollProgress, rows.length, isInitialLoading]);
+
+  if (isInitialLoading) {
+    return (
+      <div className="object-table-wrap">
+        <table className="object-table">
+          <thead>
+            <tr>
+              <th>名称</th>
+              <th>大小</th>
+              <th>上传时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: 10 }, (_, index) => (
+              <tr key={`skeleton-${index}`}>
+                <td>
+                  <span className="skeleton-cell skeleton-name" />
+                </td>
+                <td>
+                  <span className="skeleton-cell skeleton-short" />
+                </td>
+                <td>
+                  <span className="skeleton-cell skeleton-medium" />
+                </td>
+                <td>
+                  <span className="skeleton-cell skeleton-short" />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
 
   if (!rows.length) {
-    return <div className="empty-state">No objects found in this location.</div>;
+    return (
+      <div className="empty-state">
+        {normalized ? "没有找到匹配的文件，试试其他名称。" : "这里还没有任何文件。"}
+      </div>
+    );
   }
 
   return (
@@ -207,15 +220,15 @@ export const ObjectTable = ({
         <table className="object-table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Size</th>
-              <th>Modified</th>
-              <th>Actions</th>
+              <th>名称</th>
+              <th>大小</th>
+              <th>上传时间</th>
+              <th>操作</th>
             </tr>
           </thead>
           <tbody>
             {paddingTop > 0 ? (
-              <tr aria-hidden="true">
+              <tr className="virtual-spacer" aria-hidden="true">
                 <td
                   colSpan={4}
                   style={{ height: `${paddingTop}px`, padding: 0, borderBottom: "none" }}
@@ -229,7 +242,12 @@ export const ObjectTable = ({
                 const folder = row.value;
 
                 return (
-                  <tr key={row.id} data-index={virtualItem.index} ref={virtualizer.measureElement}>
+                  <tr
+                    className="folder-row"
+                    key={row.id}
+                    data-index={virtualItem.index}
+                    ref={virtualizer.measureElement}
+                  >
                     <td>
                       <button
                         type="button"
@@ -241,16 +259,17 @@ export const ObjectTable = ({
                         <span className="name-text">{folder.name}</span>
                       </button>
                     </td>
-                    <td>-</td>
-                    <td>-</td>
+                    <td className="file-metadata">-</td>
+                    <td className="file-metadata">-</td>
                     <td>
                       <div className="table-actions">
                         <button
                           type="button"
                           className="danger"
+                          aria-label={`删除文件夹 ${folder.name}`}
                           onClick={() => onDeleteFolder(folder.key)}
                         >
-                          Delete
+                          删除
                         </button>
                       </div>
                     </td>
@@ -263,29 +282,57 @@ export const ObjectTable = ({
               return (
                 <tr key={row.id} data-index={virtualItem.index} ref={virtualizer.measureElement}>
                   <td>
-                    <button
-                      type="button"
-                      className="link-button name-button"
-                      onClick={() => onSelectFile(file)}
-                      title={file.name}
-                    >
-                      <FileIcon name={file.name} />
-                      <span className="name-text">{file.name}</span>
-                    </button>
+                    <div className="file-name-with-selection">
+                      {shareBaseUrl ? (
+                        <input
+                          type="checkbox"
+                          checked={selectedFileKeys.has(file.key)}
+                          onChange={() => onToggleFileSelection(file.key)}
+                          aria-label={`选择 ${file.name}`}
+                        />
+                      ) : null}
+                      <button
+                        type="button"
+                        className="link-button name-button"
+                        onClick={() => onSelectFile(file)}
+                        title={file.name}
+                      >
+                        <FileIcon name={file.name} />
+                        <span className="name-text">{file.name}</span>
+                      </button>
+                    </div>
                   </td>
-                  <td>{formatSize(file.size)}</td>
-                  <td>{formatModified(file.lastModified)}</td>
+                  <td className="file-metadata" data-label="大小">
+                    {formatSize(file.size)}
+                  </td>
+                  <td className="file-metadata" data-label="修改">
+                    {formatModified(file.lastModified)}
+                  </td>
                   <td>
                     <div className="table-actions">
-                      <button type="button" onClick={() => onDownloadFile(file.key)}>
-                        Download
+                      <button
+                        type="button"
+                        aria-label={`下载 ${file.name}`}
+                        onClick={() => onDownloadFile(file.key)}
+                      >
+                        下载
                       </button>
+                      {shareBaseUrl ? (
+                        <button
+                          type="button"
+                          aria-label={`分享 ${file.name}`}
+                          onClick={() => onShareFile(file)}
+                        >
+                          分享短链
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         className="danger"
+                        aria-label={`删除文件 ${file.name}`}
                         onClick={() => onDeleteFile(file.key)}
                       >
-                        Delete
+                        删除
                       </button>
                     </div>
                   </td>
@@ -293,7 +340,7 @@ export const ObjectTable = ({
               );
             })}
             {paddingBottom > 0 ? (
-              <tr aria-hidden="true">
+              <tr className="virtual-spacer" aria-hidden="true">
                 <td
                   colSpan={4}
                   style={{ height: `${paddingBottom}px`, padding: 0, borderBottom: "none" }}
@@ -305,7 +352,7 @@ export const ObjectTable = ({
       </div>
       {loadingMore ? (
         <div className="object-table-loading-more" aria-live="polite">
-          Loading more...
+          正在加载更多...
         </div>
       ) : null}
     </div>

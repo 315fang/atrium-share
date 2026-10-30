@@ -1,3 +1,4 @@
+// Modified for Atrium Share. See ATTRIBUTION.md for upstream provenance and changes.
 import type { FileEntry, FolderEntry } from "./types";
 
 type S3Entry = FileEntry | FolderEntry;
@@ -12,6 +13,17 @@ export const buildS3Uri = (bucket: string, entry: S3Entry): string => {
       : normalizedKey.replace(/\/+$/, "");
 
   return key ? `s3://${bucket}/${key}` : `s3://${bucket}`;
+};
+
+export const buildShareUrl = (baseUrl: string, key: string): string => {
+  const base = baseUrl.replace(/\/+$/, "");
+  const path = key
+    .replace(/^\/+/, "")
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+
+  return path ? `${base}/${path}` : base;
 };
 
 export const copyTextToClipboard = async (text: string): Promise<void> => {

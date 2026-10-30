@@ -1,3 +1,4 @@
+// Modified for Atrium Share. See ATTRIBUTION.md for upstream provenance and changes.
 import { Readable } from "node:stream";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
@@ -24,9 +25,9 @@ import {
   listBuckets,
   listObjects,
   putObjectTags,
-  uploadObject,
 } from "./s3.js";
 import type { AuditEvent } from "./audit/index.js";
+import { recordIndexedObject, removeIndexedObject } from "./object-index.js";
 import {
   getCachedListObjectsResponse,
   invalidateCachedListObjectsByPrefix,
@@ -146,67 +147,22 @@ const normalizeFolderName = (value: string): string => {
   const trimmed = value.trim();
 
   if (!trimmed) {
-    throw new AppError("Folder name is required.", 400, true);
+    throw new AppError("文件夹名不能为空。", 400, true);
   }
 
   if (trimmed === "." || trimmed === "..") {
-    throw new AppError("Folder name cannot be . or ..", 400, true);
+    throw new AppError("文件夹名不能是 . 或 ..", 400, true);
   }
 
   if (trimmed.includes("/") || trimmed.includes("\\")) {
-    throw new AppError("Folder name cannot contain / or backslash.", 400, true);
+    throw new AppError("文件夹名不能包含 / 或反斜杠。", 400, true);
   }
 
   if (trimmed.length > 1024) {
-    throw new AppError("Folder name is too long.", 400, true);
+    throw new AppError("文件夹名过长。", 400, true);
   }
 
   return trimmed;
-};
-
-const normalizeUploadPath = (value: string): string => {
-  const normalized = value.replace(/\\+/g, "/").trim().replace(/^\/+/, "");
-
-  if (!normalized) {
-    throw new AppError("Upload path is required.", 400, true);
-  }
-
-  const segments = normalized
-    .split("/")
-    .map((segment) => segment.trim())
-    .filter(Boolean);
-
-  if (!segments.length) {
-    throw new AppError("Upload path is required.", 400, true);
-  }
-
-  for (const segment of segments) {
-    if (segment === "." || segment === "..") {
-      throw new AppError("Upload path contains invalid segments.", 400, true);
-    }
-
-    if (segment.includes("\u0000")) {
-      throw new AppError("Upload path contains invalid characters.", 400, true);
-    }
-  }
-
-  return segments.join("/");
-};
-
-const getRelativePathFieldValue = (file: { fields?: unknown }): string | undefined => {
-  if (!file.fields || typeof file.fields !== "object") {
-    return undefined;
-  }
-
-  const fields = file.fields as Record<string, unknown>;
-  const field = fields.relativePath;
-
-  if (Array.isArray(field) || !field || typeof field !== "object") {
-    return undefined;
-  }
-
-  const value = (field as { value?: unknown }).value;
-  return typeof value === "string" ? value : undefined;
 };
 
 const getParentPrefixFromObjectKey = (key: string): string => {
@@ -538,67 +494,8 @@ export const registerS3Routes = (app: FastifyInstance): void => {
     },
   );
 
-  app.post("/api/s3/upload", { preHandler: requireSession }, async (request) => {
-    const startedAt = Date.now();
-    const query = z
-      .object({
-        bucket: z.string().min(1),
-        prefix: z.string().default(""),
-      })
-      .parse(request.query);
-
-    const file = await request.file();
-
-    if (!file) {
-      recordS3Event(request, {
-        operation: "s3.upload",
-        result: "failure",
-        bucket: query.bucket,
-        prefix: query.prefix,
-        error: "missing_file",
-        durationMs: Date.now() - startedAt,
-      });
-      throw new AppError("No file uploaded", 400, true);
-    }
-
-    const buffer = await file.toBuffer();
-    const normalizedPrefix = normalizePrefix(query.prefix);
-    const fieldRelativePath = getRelativePathFieldValue(file);
-    const normalizedRelativePath = normalizeUploadPath(fieldRelativePath ?? file.filename);
-    const key = `${normalizedPrefix}${normalizedRelativePath}`;
-
-    if (Buffer.byteLength(key, "utf8") > 1024) {
-      throw new AppError("Upload path is too long.", 400, true);
-    }
-
-    try {
-      await uploadObject(request.sessionCredentials!, query.bucket, key, buffer, file.mimetype);
-      recordS3Event(request, {
-        operation: "s3.upload",
-        result: "success",
-        bucket: query.bucket,
-        key,
-        durationMs: Date.now() - startedAt,
-      });
-      void invalidateListCacheForMutation(request.sessionToken, query.bucket, {
-        type: "object",
-        key,
-      }).catch((error) => {
-        console.error("Failed to invalidate S3 list cache after upload", error);
-      });
-
-      return { ok: true, key };
-    } catch (error) {
-      recordS3Event(request, {
-        operation: "s3.upload",
-        result: "failure",
-        bucket: query.bucket,
-        key,
-        error: toErrorMessage(error),
-        durationMs: Date.now() - startedAt,
-      });
-      throw error;
-    }
+  app.post("/api/s3/upload", { preHandler: requireSession }, async (_request, reply) => {
+    return reply.code(410).send({ error: "上传方式已升级，请刷新页面后使用可续传分片上传。" });
   });
 
   app.post("/api/s3/folder", { preHandler: requireSession }, async (request) => {
@@ -620,11 +517,15 @@ export const registerS3Routes = (app: FastifyInstance): void => {
     const folderKey = `${normalizedPrefix}${name}/`;
 
     if (Buffer.byteLength(folderKey, "utf8") > 1024) {
-      throw new AppError("Folder path is too long.", 400, true);
+      throw new AppError("文件夹路径过长。", 400, true);
     }
 
     try {
       const result = await createFolder(request.sessionCredentials!, parsed.data.bucket, folderKey);
+      recordIndexedObject(request.sessionCredentials!, parsed.data.bucket, {
+        key: folderKey,
+        size: 0,
+      });
       recordS3Event(request, {
         operation: "s3.create_folder",
         result: "success",
@@ -668,25 +569,45 @@ export const registerS3Routes = (app: FastifyInstance): void => {
       throw new AppError("Invalid download query params", 400, true);
     }
 
+    const range = request.headers.range;
+    if (range && !/^bytes=(?:\d+-\d*|-\d+)$/.test(range)) {
+      return reply.code(416).send({ error: "请求的文件范围无效" });
+    }
+
     try {
       const response = await getObject(
         request.sessionCredentials!,
         parsed.data.bucket,
         parsed.data.key,
+        range,
       );
 
       if (!response.Body) {
-        throw new AppError("Object has no body", 404, true);
+        throw new AppError("对象内容为空", 404, true);
       }
 
       const filename = parsed.data.key.split("/").pop() || parsed.data.key;
+      const encodedFilename = encodeURIComponent(filename).replace(
+        /[!'()*]/g,
+        (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+      );
 
       reply.header("Content-Type", response.ContentType || "application/octet-stream");
-      if (parsed.data.inline === "1") {
-        reply.header("Content-Disposition", `inline; filename="${filename}"`);
-      } else {
-        reply.header("Content-Disposition", `attachment; filename="${filename}"`);
-      }
+      reply.header(
+        "Content-Disposition",
+        `${parsed.data.inline === "1" ? "inline" : "attachment"}; filename="download"; filename*=UTF-8''${encodedFilename}`,
+      );
+      reply.header("Accept-Ranges", "bytes");
+      reply.header("X-Content-Type-Options", "nosniff");
+      if (response.ContentRange) reply.code(206).header("Content-Range", response.ContentRange);
+      if (response.ContentLength !== undefined)
+        reply.header("Content-Length", response.ContentLength);
+      if (response.ETag) reply.header("ETag", response.ETag);
+      if (response.LastModified) reply.header("Last-Modified", response.LastModified.toUTCString());
+      const bodyStream = response.Body as Readable;
+      reply.raw.once("close", () => {
+        if (!bodyStream.destroyed && typeof bodyStream.destroy === "function") bodyStream.destroy();
+      });
 
       recordS3Event(request, {
         operation: "s3.download",
@@ -732,7 +653,7 @@ export const registerS3Routes = (app: FastifyInstance): void => {
       );
 
       if (!response.Body) {
-        throw new AppError("Object has no body", 404, true);
+        throw new AppError("对象内容为空", 404, true);
       }
 
       let content = "";
@@ -938,6 +859,7 @@ export const registerS3Routes = (app: FastifyInstance): void => {
 
     try {
       await deleteObject(request.sessionCredentials!, parsed.data.bucket, parsed.data.key);
+      removeIndexedObject(request.sessionCredentials!, parsed.data.bucket, parsed.data.key);
       recordS3Event(request, {
         operation: "s3.delete_object",
         result: "success",
@@ -985,6 +907,12 @@ export const registerS3Routes = (app: FastifyInstance): void => {
         request.sessionCredentials!,
         parsed.data.bucket,
         parsed.data.prefix,
+      );
+      removeIndexedObject(
+        request.sessionCredentials!,
+        parsed.data.bucket,
+        parsed.data.prefix,
+        true,
       );
       recordS3Event(request, {
         operation: "s3.delete_prefix",

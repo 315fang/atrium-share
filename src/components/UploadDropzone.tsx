@@ -1,3 +1,4 @@
+// Modified for Atrium Share. See ATTRIBUTION.md for upstream provenance and changes.
 import { useMemo, useRef, type DragEvent } from "react";
 import type { UploadSelection, UploadSourceFile } from "../app/lib/types";
 
@@ -143,6 +144,8 @@ export const UploadDropzone = ({ disabled, onSelection }: UploadDropzoneProps) =
         type="file"
         multiple
         className="visually-hidden"
+        tabIndex={-1}
+        aria-label="上传文件"
         onChange={(event) => {
           if (event.target.files) {
             void onSelection({
@@ -159,6 +162,8 @@ export const UploadDropzone = ({ disabled, onSelection }: UploadDropzoneProps) =
         type="file"
         multiple
         className="visually-hidden"
+        tabIndex={-1}
+        aria-label="上传文件夹"
         onChange={(event) => {
           if (event.target.files) {
             void onSelection({
@@ -170,7 +175,8 @@ export const UploadDropzone = ({ disabled, onSelection }: UploadDropzoneProps) =
         }}
         disabled={disabled || !supportsDirectoryPicker}
       />
-      <p>Drop files here or</p>
+      <p className="dropzone-desktop-hint">把文件拖到此处,或</p>
+      <p className="dropzone-mobile-hint">上传到当前文件夹</p>
       <button
         type="button"
         disabled={disabled}
@@ -178,7 +184,7 @@ export const UploadDropzone = ({ disabled, onSelection }: UploadDropzoneProps) =
           fileInputRef.current?.click();
         }}
       >
-        Choose files
+        选择文件
       </button>
       <button
         type="button"
@@ -192,9 +198,11 @@ export const UploadDropzone = ({ disabled, onSelection }: UploadDropzoneProps) =
           folderInputRef.current.click();
         }}
       >
-        Choose folder
+        选择文件夹
       </button>
-      {!supportsDirectoryPicker ? <p className="dropzone-hint">Folder picker unavailable</p> : null}
+      {!supportsDirectoryPicker ? (
+        <p className="dropzone-hint">当前浏览器不支持选择文件夹</p>
+      ) : null}
     </div>
   );
 };

@@ -4,7 +4,9 @@
 
 Atrium Share is a self-hosted application for managing and sharing files in S3-compatible storage. Upload a batch and copy one short-code link. Recipients can view images, play supported media, inspect file details, and choose what to download without signing in.
 
-This is an independently maintained fork of [aldy505/atrium](https://github.com/aldy505/atrium). It extends the original React, Fastify, and S3 browser with file sharing workflows. Upstream Git history and the Apache-2.0 license are preserved; see [ATTRIBUTION.md](ATTRIBUTION.md) for credits and modifications. The current interface is in Chinese.
+Thank you to **Reinaldy Rafli ([@aldy505](https://github.com/aldy505)) and the Atrium contributors** for creating and sharing Atrium. Its React interface, Fastify server, and S3-compatible file browser provide the foundation this project builds on.
+
+Atrium Share is an independently maintained fork of [aldy505/atrium](https://github.com/aldy505/atrium), focused on file sharing workflows. Upstream Git history and the [Apache-2.0 license](LICENSE) are preserved; see [ATTRIBUTION.md](ATTRIBUTION.md) for credits and modifications. The current interface is in Chinese.
 
 ## Features
 

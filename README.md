@@ -4,7 +4,11 @@
 
 Atrium Share 是一个自托管的 S3 文件管理与分享应用。上传一批文件，复制一条短码链接；接收者无需登录，即可先看图片、播放视频、查看详情，再选择需要下载的文件。
 
-本项目是 [aldy505/atrium](https://github.com/aldy505/atrium) 的独立维护 Fork，基于原有 React、Fastify 和 S3 管理能力扩展分享工作流。保留上游 Git 历史与 Apache-2.0 许可证，原作者及改动归因见 [ATTRIBUTION.md](ATTRIBUTION.md)。默认界面为中文。
+## 致谢与项目来源
+
+感谢 [Reinaldy Rafli（@aldy505）](https://github.com/aldy505) 创建并开源 [Atrium](https://github.com/aldy505/atrium)，也感谢所有上游贡献者。Atrium 提供了 React 界面、Fastify 服务端和 S3 文件管理的基础，让我们能够在此之上完善批量分享、接收者预览和按需下载的使用体验。
+
+Atrium Share 是基于 Atrium 的独立维护 Fork，由 [@315fang](https://github.com/315fang) 维护，重点扩展文件分享工作流，默认界面为中文。我们保留上游完整 Git 历史、Apache-2.0 许可证及原作者归因；详细来源与改动说明见 [ATTRIBUTION.md](ATTRIBUTION.md)。
 
 ## 可以做什么
 
